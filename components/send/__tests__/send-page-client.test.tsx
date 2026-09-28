@@ -19,6 +19,29 @@ describe('SendPageClient', () => {
     })
   })
 
+  it('redirects to /home (a real route) when the success step is done', async () => {
+    jest.useFakeTimers()
+    render(<SendPageClient />)
+
+    fireEvent.change(screen.getByPlaceholderText('G... or @username'), {
+      target: { value: 'GABCDEF123' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }))
+
+    fireEvent.click(screen.getByRole('button', { name: '1' }))
+    fireEvent.click(screen.getByRole('button', { name: /review/i }))
+
+    fireEvent.click(screen.getByRole('button', { name: /confirm send/i }))
+    await jest.runAllTimersAsync()
+
+    fireEvent.click(screen.getByRole('button', { name: /back to dashboard/i }))
+
+    expect(mockPush).toHaveBeenCalledWith('/home')
+    expect(mockPush).not.toHaveBeenCalledWith('/dashboard')
+
+    jest.useRealTimers()
+  })
+
   it('keeps the amount display above the keypad on short screens', () => {
     render(<SendPageClient />)
 

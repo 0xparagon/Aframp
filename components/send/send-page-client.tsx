@@ -65,7 +65,7 @@ export function SendPageClient() {
     } else if (step === 'confirm') {
       setStep('amount')
     } else {
-      router.push('/dashboard')
+      router.push('/home')
     }
   }
 
@@ -317,7 +317,7 @@ export function SendPageClient() {
             isSending={isSending}
             onBack={() => setStep('amount')}
             onConfirm={handleSend}
-            onDone={() => router.push('/dashboard')}
+            onDone={() => router.push('/home')}
           />
         )}
       </div>
