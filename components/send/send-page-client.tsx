@@ -10,7 +10,7 @@ import { RecentRecipients } from './recent-recipients'
 import { QRScanner } from './qr-scanner'
 import { TransactionConfirmation } from './transaction-confirmation'
 
-type Step = 'recipient' | 'amount' | 'confirm' | 'success'
+type Step = 'recipient' | 'amount' | 'confirm' | 'success' | 'failure'
 
 export interface CryptoAsset {
   symbol: string
@@ -46,6 +46,8 @@ export function SendPageClient() {
   const [step, setStep] = useState<Step>('recipient')
   const [scannerOpen, setScannerOpen] = useState(false)
   const [isSending, setIsSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [failureReason, setFailureReason] = useState<string | null>(null)
   const [recipientInput, setRecipientInput] = useState('')
   const [form, setForm] = useState<SendFormState>({
     recipient: null,
@@ -105,9 +107,29 @@ export function SendPageClient() {
 
   const handleSend = async () => {
     setIsSending(true)
-    await new Promise((resolve) => setTimeout(resolve, 2200))
-    setIsSending(false)
-    setStep('success')
+    setError(null)
+    setFailureReason(null)
+    try {
+      // Simulate API call with a chance of failure for testing
+      await new Promise((resolve) => setTimeout(resolve, 2200))
+      // In production, this would be: await api.createRemittance(...)
+      setIsSending(false)
+      setStep('success')
+    } catch (cause) {
+      setIsSending(false)
+      const errorMsg = cause instanceof Error ? cause.message : 'Send failed'
+      // Extract failure_reason if available from API response
+      const failureReasonMsg = cause instanceof Error && 'failureReason' in cause 
+        ? (cause as any).failureReason 
+        : undefined
+      setError(errorMsg)
+      setFailureReason(failureReasonMsg || null)
+      setStep('failure')
+    }
+  }
+
+  const handleRetry = async () => {
+    await handleSend()
   }
 
   const isRecipientValid = recipientInput.trim().length > 5
@@ -309,15 +331,18 @@ export function SendPageClient() {
           </div>
         )}
 
-        {/* ── Confirm & Success Steps ── */}
-        {(step === 'confirm' || step === 'success') && (
+        {/* ── Confirm, Success & Failure Steps ── */}
+        {(step === 'confirm' || step === 'success' || step === 'failure') && (
           <TransactionConfirmation
             form={form}
             step={step}
             isSending={isSending}
-            onBack={() => setStep('amount')}
+            error={error}
+            failureReason={failureReason}
+            onBack={() => step === 'failure' ? setStep('confirm') : setStep('amount')}
             onConfirm={handleSend}
             onDone={() => router.push('/dashboard')}
+            onRetry={handleRetry}
           />
         )}
       </div>
