@@ -21,7 +21,7 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    if (ready && session) router.replace('/charge')
+    if (ready && session) router.replace('/home')
   }, [ready, session, router])
 
   async function handleSubmit(event: React.FormEvent) {
@@ -41,7 +41,7 @@ export default function LoginPage() {
       if ('challenge_id' in result) {
         router.push(`/verify?challenge_id=${result.challenge_id}&flow=login`)
       } else {
-        router.replace('/charge')
+        router.replace('/home')
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Sign in failed')

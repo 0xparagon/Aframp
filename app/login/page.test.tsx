@@ -47,7 +47,7 @@ describe('LoginPage', () => {
     expect(signIn).not.toHaveBeenCalled()
   })
 
-  it('goes straight to /charge for a legacy account that gets a session directly', async () => {
+  it('goes straight to /home for a legacy account that gets a session directly', async () => {
     const user = userEvent.setup()
     signIn.mockResolvedValue({ token: 't', user_id: 'u', merchant_id: 'm' })
     render(<LoginPage />)
@@ -57,7 +57,7 @@ describe('LoginPage', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
     expect(signIn).toHaveBeenCalledWith('merchant@example.com', 'secret-pass')
-    expect(replace).toHaveBeenCalledWith('/charge')
+    expect(replace).toHaveBeenCalledWith('/home')
     expect(push).not.toHaveBeenCalled()
   })
 
@@ -71,7 +71,7 @@ describe('LoginPage', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
     expect(push).toHaveBeenCalledWith('/verify?challenge_id=chal-123&flow=login')
-    expect(replace).not.toHaveBeenCalledWith('/charge')
+    expect(replace).not.toHaveBeenCalledWith('/home')
   })
 
   it('displays the backend error when sign-in fails', async () => {

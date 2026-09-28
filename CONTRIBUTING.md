@@ -285,6 +285,19 @@ npm run test:watch
 npm run test:coverage
 ```
 
+### End-to-End Tests
+
+Install the Chromium browser once after installing npm dependencies, then run the Playwright suite:
+
+```bash
+npm ci
+npx playwright install chromium
+npm run test:e2e
+```
+
+The Playwright configuration starts the Next.js development server on port 3001. The E2E tests
+intercept backend requests so the login and payment-request flows do not require a running API.
+
 ### Coverage Requirements
 
 - **Minimum:** 70% across all metrics
