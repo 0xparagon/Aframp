@@ -1,13 +1,27 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { ErrorState } from '@/components/ui/error-state'
 import { EmptyStateIllustration } from '@/components/ui/empty-state-illustration'
-import { api, ApiError, type Balance, type Payment, type PaymentStatus, type Refund } from '@/lib/api'
+import {
+  api,
+  ApiError,
+  type Balance,
+  type Payment,
+  type PaymentStatus,
+  type Refund,
+} from '@/lib/api'
 import { formatStroops } from '@/lib/money'
+import {
+  filterPaymentsByDateRange,
+  filterPaymentsByStatus,
+  searchPayments,
+} from '@/lib/transaction-filters'
 import { useAuthenticatedSession } from '@/components/session-provider'
 
 /** Testnet today; swap for `public` when the backend points at mainnet Horizon. */
@@ -18,6 +32,27 @@ const STATUS_LABEL: Record<PaymentStatus, string> = {
   verified: 'Verifying',
   confirmed: 'Paid',
   failed: 'Failed',
+}
+
+const FILTERABLE_STATUSES: PaymentStatus[] = ['detected', 'verified', 'confirmed', 'failed']
+
+function DebouncedSearchInput({ onSearch }: { onSearch: (query: string) => void }) {
+  const [query, setQuery] = useState('')
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => onSearch(query), 250)
+    return () => window.clearTimeout(timeout)
+  }, [onSearch, query])
+
+  return (
+    <Input
+      id="transaction-search"
+      type="search"
+      placeholder="Hash, wallet address, or asset"
+      value={query}
+      onChange={(event) => setQuery(event.target.value)}
+    />
+  )
 }
 
 function statusVariant(status: PaymentStatus) {
@@ -42,6 +77,10 @@ export default function TransactionsPage() {
   const [refunds, setRefunds] = useState<Refund[]>([])
   const [refundingId, setRefundingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<PaymentStatus | 'all'>('all')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -99,6 +138,13 @@ export default function TransactionsPage() {
     return () => controller.abort()
   }, [load])
 
+  const filteredPayments = useMemo(() => {
+    if (!payments) return []
+    const searched = searchPayments(payments, searchQuery)
+    const statusFiltered = filterPaymentsByStatus(searched, statusFilter)
+    return filterPaymentsByDateRange(statusFiltered, fromDate, toDate)
+  }, [payments, searchQuery, statusFilter, fromDate, toDate])
+
   if (error)
     return (
       <ErrorState
@@ -147,44 +193,98 @@ export default function TransactionsPage() {
           </p>
         </div>
       ) : (
-        <ul className="border-hairline mt-6 divide-y">
-          {payments.map((payment) => (
-            <li key={payment.id} className="flex items-center justify-between gap-3 py-3">
-              <div className="min-w-0 space-y-1">
-                <p className="text-base font-bold tabular-nums text-white">
-                  {formatStroops(payment.amount_stroops)} {payment.asset}
-                </p>
-                <p className="text-dim text-xs">
-                  {formatWhen(payment.created_at)} ·{' '}
-                  <a
-                    href={`${EXPLORER_BASE}/${payment.tx_hash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-bright underline underline-offset-2"
-                  >
-                    Receipt
-                  </a>
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {payment.status === 'confirmed' && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void handleRefund(payment)}
-                    disabled={refundingId === payment.id}
-                  >
-                    {refundingId === payment.id ? 'Refunding…' : 'Refund'}
-                  </Button>
-                )}
-                <Badge variant={statusVariant(payment.status)}>
-                  {STATUS_LABEL[payment.status] ?? payment.status}
-                </Badge>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <>
+          <section
+            aria-label="Filter transactions"
+            className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+          >
+            <div className="space-y-1">
+              <Label htmlFor="transaction-search">Search</Label>
+              <DebouncedSearchInput onSearch={setSearchQuery} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="transaction-status">Status</Label>
+              <select
+                id="transaction-status"
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as PaymentStatus | 'all')}
+                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              >
+                <option value="all">All statuses</option>
+                {FILTERABLE_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {status[0].toUpperCase() + status.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="transaction-from-date">From date</Label>
+              <Input
+                id="transaction-from-date"
+                type="date"
+                max={toDate || undefined}
+                value={fromDate}
+                onChange={(event) => setFromDate(event.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="transaction-to-date">To date</Label>
+              <Input
+                id="transaction-to-date"
+                type="date"
+                min={fromDate || undefined}
+                value={toDate}
+                onChange={(event) => setToDate(event.target.value)}
+              />
+            </div>
+          </section>
+
+          {filteredPayments.length === 0 ? (
+            <p role="status" className="text-dim mt-6 text-sm">
+              No payments match these filters.
+            </p>
+          ) : (
+            <ul className="border-hairline mt-6 divide-y">
+              {filteredPayments.map((payment) => (
+                <li key={payment.id} className="flex items-center justify-between gap-3 py-3">
+                  <div className="min-w-0 space-y-1">
+                    <p className="text-base font-bold tabular-nums text-white">
+                      {formatStroops(payment.amount_stroops)} {payment.asset}
+                    </p>
+                    <p className="text-dim text-xs">
+                      {formatWhen(payment.created_at)} ·{' '}
+                      <a
+                        href={`${EXPLORER_BASE}/${payment.tx_hash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-bright underline underline-offset-2"
+                      >
+                        Receipt
+                      </a>
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {payment.status === 'confirmed' && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void handleRefund(payment)}
+                        disabled={refundingId === payment.id}
+                      >
+                        {refundingId === payment.id ? 'Refunding…' : 'Refund'}
+                      </Button>
+                    )}
+                    <Badge variant={statusVariant(payment.status)}>
+                      {STATUS_LABEL[payment.status] ?? payment.status}
+                    </Badge>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
 
       <section className="mt-8 space-y-3">
@@ -194,7 +294,10 @@ export default function TransactionsPage() {
         ) : (
           <ul className="border-hairline divide-y rounded-2xl border">
             {refunds.map((refund) => (
-              <li key={refund.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+              <li
+                key={refund.id}
+                className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+              >
                 <span className="tabular-nums font-medium">
                   {formatStroops(refund.amount_stroops)} {refund.asset}
                 </span>

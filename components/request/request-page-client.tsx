@@ -1,17 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  ArrowLeft,
-  Copy,
-  Check,
-  Camera,
-  AlertCircle,
-} from 'lucide-react'
+import { ArrowLeft, Copy, Check, Camera, AlertCircle } from 'lucide-react'
 import QRCode from 'react-qr-code'
 import { Button } from '@/components/ui/button'
 import { QRScanner } from '@/components/send/qr-scanner'
+import { useMediaQuery } from '@/hooks/use-media-query'
 import { cn } from '@/lib/utils'
 
 interface RequestPageClientProps {
@@ -35,16 +30,8 @@ export function RequestPageClient({ requestId }: RequestPageClientProps) {
   const router = useRouter()
   const [scannerOpen, setScannerOpen] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
+  const isMobile = useMediaQuery('(max-width: 767px)')
   const [scannedAddress, setScannedAddress] = useState<string | null>(null)
-
-  // Detect mobile viewport
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
-  }, [])
 
   const handleCopyWallet = async () => {
     await navigator.clipboard.writeText(MOCK_REQUEST.requesterWallet)
@@ -82,12 +69,8 @@ export function RequestPageClient({ requestId }: RequestPageClientProps) {
               Amount requested
             </p>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-foreground">
-                {MOCK_REQUEST.amount}
-              </span>
-              <span className="text-lg text-muted-foreground">
-                {MOCK_REQUEST.currency}
-              </span>
+              <span className="text-3xl font-bold text-foreground">{MOCK_REQUEST.amount}</span>
+              <span className="text-lg text-muted-foreground">{MOCK_REQUEST.currency}</span>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
               on Stellar network via {MOCK_REQUEST.asset}
@@ -100,27 +83,21 @@ export function RequestPageClient({ requestId }: RequestPageClientProps) {
               <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">
                 Requested by
               </p>
-              <p className="text-sm font-semibold text-foreground">
-                {MOCK_REQUEST.requesterName}
-              </p>
+              <p className="text-sm font-semibold text-foreground">{MOCK_REQUEST.requesterName}</p>
             </div>
             {MOCK_REQUEST.description && (
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">
                   Description
                 </p>
-                <p className="text-sm text-foreground">
-                  {MOCK_REQUEST.description}
-                </p>
+                <p className="text-sm text-foreground">{MOCK_REQUEST.description}</p>
               </div>
             )}
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">
                 Expires
               </p>
-              <p className="text-sm text-foreground">
-                {MOCK_REQUEST.expiresAt.toLocaleString()}
-              </p>
+              <p className="text-sm text-foreground">{MOCK_REQUEST.expiresAt.toLocaleString()}</p>
             </div>
           </div>
 
@@ -203,10 +180,7 @@ export function RequestPageClient({ requestId }: RequestPageClientProps) {
 
       {/* ── QR Scanner Modal ── */}
       {scannerOpen && (
-        <QRScanner
-          onScan={handleScanPayment}
-          onClose={() => setScannerOpen(false)}
-        />
+        <QRScanner onScan={handleScanPayment} onClose={() => setScannerOpen(false)} />
       )}
     </div>
   )
