@@ -4,10 +4,13 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   ArrowDownToLine,
+  ArrowUpToLine,
   Banknote,
   Home,
   LogOut,
   Receipt,
+  Settings,
+  Users,
   Wallet as WalletIcon,
 } from 'lucide-react'
 
@@ -18,9 +21,12 @@ import { cn } from '@/lib/utils'
 const LINKS = [
   { label: 'Home', icon: Home, href: '/home' },
   { label: 'Charge', icon: Banknote, href: '/charge' },
+  { label: 'Send money', icon: ArrowUpToLine, href: '/send' },
+  { label: 'Contacts', icon: Users, href: '/contacts' },
   { label: 'Payments', icon: Receipt, href: '/transactions' },
   { label: 'Cash out', icon: ArrowDownToLine, href: '/withdraw' },
   { label: 'Wallet', icon: WalletIcon, href: '/wallet' },
+  { label: 'Settings', icon: Settings, href: '/settings' },
 ]
 
 export function WalletSidebar() {

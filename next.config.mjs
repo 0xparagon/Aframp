@@ -1,6 +1,7 @@
 import withPWAInit from 'next-pwa'
 import defaultRuntimeCaching from 'next-pwa/cache.js'
 import { withSentryConfig } from '@sentry/nextjs'
+import withBundleAnalyzer from '@next/bundle-analyzer'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -34,6 +35,19 @@ const nextConfig = {
     minimumCacheTTL: 60,
   },
   output: 'standalone',
+  // The browser only ever calls this app's own origin at `/backend/*`; this
+  // forwards those requests server-side to the real backend. NEXT_API_URL
+  // (deliberately not NEXT_PUBLIC_*) never reaches client-side code — it
+  // can't leak via devtools, a bundle diff, or CSP `connect-src`.
+  rewrites() {
+    const backendUrl = (process.env.NEXT_API_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '')
+    return [
+      {
+        source: '/backend/:path*',
+        destination: `${backendUrl}/:path*`,
+      },
+    ]
+  },
   headers() {
     const csp = [
       "default-src 'self'",
@@ -94,5 +108,9 @@ const withPWA = withPWAInit({
 })
 
 const configWithPWA = withPWA(nextConfig)
+const withAnalyzer = withBundleAnalyzer({
+  enabled: process.env.ANALYZE === 'true',
+  openAnalyzer: false,
+})
 
-export default withSentryConfig(configWithPWA)
+export default withSentryConfig(withAnalyzer(configWithPWA))
