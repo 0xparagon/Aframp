@@ -37,6 +37,8 @@ export function RequestPageClient({ requestId }: RequestPageClientProps) {
   const [copied, setCopied] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [scannedAddress, setScannedAddress] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
   // Detect mobile viewport
   useEffect(() => {
@@ -52,11 +54,38 @@ export function RequestPageClient({ requestId }: RequestPageClientProps) {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleScanPayment = (address: string) => {
-    // In production, verify the scanned address and process payment
+  const handleScanPayment = async (address: string) => {
     setScannedAddress(address)
     setScannerOpen(false)
-    // TODO: Submit payment confirmation to backend
+
+    // Validate address format (basic Stellar address validation)
+    if (!/^G[A-Z0-9]{55}$/.test(address)) {
+      setError('Invalid Stellar address format')
+      return
+    }
+
+    setSubmitting(true)
+    setError(null)
+    
+    try {
+      // Backend call to confirm payment after scan
+      // TODO: Replace mock with actual API endpoint when backend is ready:
+      // await api.confirmScannedPayment(requestId, address)
+      
+      // Mock success for now - would navigate or show success state
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Success: could navigate to success screen or update UI
+      // router.push(`/request/${requestId}/success`)
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to confirm payment. Please try again.'
+      )
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const qrValue = `stellar:${MOCK_REQUEST.requesterWallet}?amount=${MOCK_REQUEST.amount}&memo=${requestId}`
@@ -179,19 +208,33 @@ export function RequestPageClient({ requestId }: RequestPageClientProps) {
           {isMobile && (
             <Button
               onClick={() => setScannerOpen(true)}
+              disabled={submitting}
               className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-xl flex gap-2"
             >
               <Camera className="w-5 h-5" />
-              Pay with camera
+              {submitting ? 'Confirming...' : 'Pay with camera'}
             </Button>
           )}
 
+          {/* ── Error message ── */}
+          {error && (
+            <div className="rounded-2xl border border-red-500/40 bg-red-500/5 p-4 flex gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-red-700">Error</p>
+                <p className="text-xs text-red-600 mt-1">{error}</p>
+              </div>
+            </div>
+          )}
+
           {/* ── Scanned address confirmation ── */}
-          {scannedAddress && (
+          {scannedAddress && !error && (
             <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/5 p-4 flex gap-3">
               <AlertCircle className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-emerald-700">Payment detected</p>
+                <p className="text-sm font-semibold text-emerald-700">
+                  {submitting ? 'Confirming payment...' : 'Payment confirmed'}
+                </p>
                 <p className="text-xs text-emerald-600 mt-1">
                   From: {scannedAddress.slice(0, 10)}...{scannedAddress.slice(-10)}
                 </p>
