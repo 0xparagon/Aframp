@@ -343,8 +343,13 @@ export interface PushSubscriptionStatus {
   enabled: boolean
 }
 
+const BIGINT_KEYS_PATTERN = Array.from(BIGINT_KEYS).join('|')
+
 export function parseWithBigInts<T>(text: string): T {
-  const quoted = text.replace(/"(amount_stroops|available|pending)"\s*:\s*(-?\d+)/g, '"$1":"$2"')
+  const quoted = text.replace(
+    new RegExp(`"(${BIGINT_KEYS_PATTERN})"\\s*:\\s*(-?\\d+)`, 'g'),
+    '"$1":"$2"'
+  )
   return JSON.parse(quoted, (key, value) =>
     BIGINT_KEYS.has(key) && typeof value === 'string' ? BigInt(value) : value
   ) as T
