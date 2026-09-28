@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -22,14 +22,56 @@ interface ZarOnrampProps {
   onSuccess?: (txHash: string) => void
 }
 
-export function ZarOnramp({ token }: ZarOnrampProps) {
+const OZOW_TRANSACTION_ID_KEY = 'ozow_transaction_id'
+
+export function ZarOnramp({ token, onSuccess }: ZarOnrampProps) {
   const [amount, setAmount] = useState('')
   const [selectedBank, setSelectedBank] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isVerifying, setIsVerifying] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const amountNum = parseFloat(amount) || 0
   const fees = amountNum > 0 ? calculateFees(amountNum, 'ozow') : null
+
+  // Post-redirect verification: Ozow sends the user back to returnUrl with
+  // ?provider=ozow but no transaction id, so we recover it from where
+  // handleSubmit stashed it before leaving the page.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('provider') !== 'ozow') return
+
+    const transactionId = sessionStorage.getItem(OZOW_TRANSACTION_ID_KEY)
+    if (!transactionId) return
+
+    let cancelled = false
+    setIsVerifying(true)
+
+    api
+      .verifyOzowPayment(token, transactionId)
+      .then((result) => {
+        if (cancelled) return
+        if (result.status === 'completed' || result.status === 'failed') {
+          sessionStorage.removeItem(OZOW_TRANSACTION_ID_KEY)
+        }
+        if (result.status === 'completed' && result.tx_hash) {
+          onSuccess?.(result.tx_hash)
+        } else if (result.status === 'failed') {
+          setError('Payment failed. Please try again.')
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setError(err instanceof Error ? err.message : 'Failed to verify payment')
+      })
+      .finally(() => {
+        if (!cancelled) setIsVerifying(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [token, onSuccess])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -40,12 +82,14 @@ export function ZarOnramp({ token }: ZarOnrampProps) {
 
     try {
       const returnUrl = `${window.location.origin}/charge?provider=ozow`
-      const { payment_url } = await api.createOzowPayment(
+      const { payment_url, transaction_id } = await api.createOzowPayment(
         token,
         amountNum,
         selectedBank,
         returnUrl
       )
+
+      sessionStorage.setItem(OZOW_TRANSACTION_ID_KEY, transaction_id)
 
       // Redirect to Ozow payment page
       window.location.href = payment_url
@@ -64,6 +108,11 @@ export function ZarOnramp({ token }: ZarOnrampProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {isVerifying && (
+          <Alert className="mb-4">
+            <AlertDescription>Verifying your payment...</AlertDescription>
+          </Alert>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="amount">Amount (ZAR)</Label>
