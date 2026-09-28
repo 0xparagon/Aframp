@@ -19,12 +19,13 @@ export default function WalletPage() {
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
     try {
-      setWallet(await api.getWallet(token))
+      setWallet(await api.getWallet(token, signal))
       setError(null)
     } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
       // 400 "no wallet created yet" is the expected state for a new merchant.
       if (cause instanceof ApiError && cause.status === 400) setWallet(null)
       else if (cause instanceof ApiError && cause.status === 0)
@@ -34,14 +35,17 @@ export default function WalletPage() {
       setLoading(false)
     }
     try {
-      setBalances(await api.getBalances(token))
-    } catch {
+      setBalances(await api.getBalances(token, signal))
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
       // Non-fatal: the address above is what matters if this fails.
     }
   }, [token])
 
   useEffect(() => {
-    void load()
+    const controller = new AbortController()
+    void load(controller.signal)
+    return () => controller.abort()
   }, [load])
 
   async function createWallet() {
