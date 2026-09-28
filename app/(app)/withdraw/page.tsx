@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { api, ApiError, type Balance, type Withdrawal, type WithdrawalStatus } from '@/lib/api'
+import { api, ApiError, type Balance, type Me, type Withdrawal, type WithdrawalStatus } from '@/lib/api'
 import { formatStroops, isWholeKobo, parseAmountToStroops } from '@/lib/money'
 import { useAuthenticatedSession } from '@/components/session-provider'
 import {
@@ -33,6 +34,7 @@ const STATUS_LABEL: Record<WithdrawalStatus, string> = {
 
 export default function WithdrawPage() {
   const { token } = useAuthenticatedSession()
+  const [me, setMe] = useState<Me | null>(null)
   const [balances, setBalances] = useState<Balance[] | null>(null)
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
   const [asset, setAsset] = useState<WithdrawalAsset>('cNGN')
@@ -45,10 +47,12 @@ export default function WithdrawPage() {
   const load = useCallback(
     async (signal?: AbortSignal) => {
       try {
-        const [nextBalances, nextWithdrawals] = await Promise.all([
+        const [nextMe, nextBalances, nextWithdrawals] = await Promise.all([
+          api.getMe(token, signal),
           api.getBalances(token, signal),
           api.listWithdrawals(token, 20, signal),
         ])
+        setMe(nextMe)
         setBalances(nextBalances)
         setWithdrawals(nextWithdrawals)
       } catch (cause) {
@@ -127,10 +131,34 @@ export default function WithdrawPage() {
     }
   }
 
-  if (!balances) {
+  if (!balances || !me) {
     return (
       <div className="flex justify-center py-16">
         <LoadingSpinner />
+      </div>
+    )
+  }
+
+  if (me.kyc_status !== 'approved') {
+    return (
+      <div>
+        <header>
+          <h1 className="text-2xl font-bold tracking-tight">Cash out</h1>
+        </header>
+
+        <div className="mt-6 max-w-xl space-y-5">
+          <Alert>
+            <AlertDescription>
+              {me.kyc_status === 'pending'
+                ? 'Your identity verification is still being reviewed. You can cash out once it is approved.'
+                : 'Verify your identity before you can cash out.'}
+            </AlertDescription>
+          </Alert>
+
+          <Button asChild>
+            <Link href="/kyc">Complete verification</Link>
+          </Button>
+        </div>
       </div>
     )
   }
@@ -234,43 +262,36 @@ export default function WithdrawPage() {
             />
           </div>
 
-          <Button type="submit" size="lg" disabled={submitting || available === 0n}>
-            {submitting ? 'Sending…' : 'Cash out'}
+          <Button type="submit" disabled={submitting || available === 0n}>
+            {submitting ? 'Submitting…' : 'Cash out'}
           </Button>
         </form>
 
-        {withdrawals.length > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-dim text-xs font-bold tracking-widest uppercase">
-              Recent cash-outs
-            </h2>
-            <ul className="border-hairline divide-y">
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold tracking-tight">Recent cash-outs</h2>
+          {withdrawals.length === 0 ? (
+            <p className="text-dim text-sm">No cash-outs yet.</p>
+          ) : (
+            <ul className="space-y-2">
               {withdrawals.map((withdrawal) => (
-                <li key={withdrawal.id} className="space-y-1 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-bold tabular-nums text-white">
-                      {formatStroops(withdrawal.amount_stroops)} {withdrawal.asset}
-                    </span>
-                    <Badge
-                      variant={
-                        withdrawal.status === 'completed'
-                          ? 'default'
-                          : withdrawal.status === 'failed'
-                            ? 'destructive'
-                            : 'secondary'
-                      }
-                    >
-                      {STATUS_LABEL[withdrawal.status] ?? withdrawal.status}
-                    </Badge>
+                <li
+                  key={withdrawal.id}
+                  className="bg-panel border-hairline flex items-center justify-between rounded-xl border p-4"
+                >
+                  <div>
+                    <p className="font-medium">
+                      {formatStroops(withdrawal.amount)} {withdrawal.asset}
+                    </p>
+                    <p className="text-dim text-xs">
+                      {new Date(withdrawal.created_at).toLocaleString()}
+                    </p>
                   </div>
-                  {withdrawal.failure_reason && (
-                    <p className="text-dim text-xs">{withdrawal.failure_reason}</p>
-                  )}
+                  <Badge>{STATUS_LABEL[withdrawal.status]}</Badge>
                 </li>
               ))}
             </ul>
-          </section>
-        )}
+          )}
+        </section>
       </div>
     </div>
   )
