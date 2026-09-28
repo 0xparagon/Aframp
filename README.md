@@ -43,6 +43,10 @@ Aframp/
 └── README.md
 ```
 
+## Architecture Decisions
+
+- [ADR 001: Keep Backend Requests Behind a Same-Origin Proxy](docs/adr-001-backend-proxy.md)
+
 ---
 
 ## � API Reference
