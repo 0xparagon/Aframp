@@ -1,88 +1,114 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import LoginPage from './page'
-import { useSession } from '@/components/session-provider'
-import { useRouter } from 'next/navigation'
 
-jest.mock('@/components/session-provider', () => ({
-  useSession: jest.fn(),
+const replace = vi.fn()
+const push = vi.fn()
+const signIn = vi.fn()
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace, push }),
 }))
 
-jest.mock('next/navigation', () => ({
-  useRouter: jest.fn(),
+vi.mock('@/components/session-provider', () => ({
+  useSession: () => ({ session: null, ready: true, signIn }),
+}))
+
+vi.mock('@/lib/api', () => ({
+  isOffline: (cause: unknown) =>
+    typeof cause === 'object' && cause !== null && (cause as { status?: number }).status === 0,
 }))
 
 describe('LoginPage', () => {
-  const replace = jest.fn()
-  const push = jest.fn()
-  const signIn = jest.fn()
-
   beforeEach(() => {
     replace.mockReset()
     push.mockReset()
     signIn.mockReset()
-    ;(useRouter as jest.Mock).mockReturnValue({ replace, push })
-    ;(useSession as jest.Mock).mockReturnValue({
-      session: null,
-      ready: true,
-      signIn,
-      signUp: jest.fn(),
-    })
   })
 
-  it('renders the sign-in form', () => {
-    render(<LoginPage />)
-
-    expect(screen.getByRole('heading', { name: /aframp pay/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
-  })
-
-  it('shows a validation message when required fields are empty', async () => {
+  it('shows a validation error when submitting with an empty email', async () => {
     const user = userEvent.setup()
     render(<LoginPage />)
 
-    await user.click(screen.getByRole('button', { name: /sign in/i }))
+    await user.type(screen.getByLabelText('Password'), 'secret')
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
 
-    expect(screen.getByText('Please enter both your email and password.')).toBeInTheDocument()
+    expect(await screen.findByText('Please enter both your email and password.')).toBeInTheDocument()
     expect(signIn).not.toHaveBeenCalled()
   })
 
-  it('goes straight to /charge for a legacy account that gets a session directly', async () => {
+  it('shows a validation error when submitting with an empty password', async () => {
     const user = userEvent.setup()
-    signIn.mockResolvedValue({ token: 't', user_id: 'u', merchant_id: 'm' })
     render(<LoginPage />)
 
-    await user.type(screen.getByLabelText(/email/i), 'merchant@example.com')
-    await user.type(screen.getByLabelText(/password/i), 'secret-pass')
-    await user.click(screen.getByRole('button', { name: /sign in/i }))
+    await user.type(screen.getByLabelText('Email'), 'merchant@example.com')
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
 
-    expect(signIn).toHaveBeenCalledWith('merchant@example.com', 'secret-pass')
-    expect(replace).toHaveBeenCalledWith('/charge')
+    expect(await screen.findByText('Please enter both your email and password.')).toBeInTheDocument()
+    expect(signIn).not.toHaveBeenCalled()
+  })
+
+  it('shows the offline alert variant when ApiError has status 0', async () => {
+    const user = userEvent.setup()
+    signIn.mockRejectedValueOnce(Object.assign(new Error('You are offline'), { status: 0 }))
+    render(<LoginPage />)
+
+    await user.type(screen.getByLabelText('Email'), 'merchant@example.com')
+    await user.type(screen.getByLabelText('Password'), 'secret')
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('You are offline')
+    expect(alert).toHaveAttribute('data-variant', 'notice')
+  })
+
+  it('navigates to /verify when the response contains a challenge_id', async () => {
+    const user = userEvent.setup()
+    signIn.mockResolvedValueOnce({ challenge_id: 'challenge-123' })
+    render(<LoginPage />)
+
+    await user.type(screen.getByLabelText('Email'), 'merchant@example.com')
+    await user.type(screen.getByLabelText('Password'), 'secret')
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith('/verify?challenge_id=challenge-123&flow=login'),
+    )
+    expect(replace).not.toHaveBeenCalled()
+  })
+
+  it('navigates to /charge on a direct AuthResponse', async () => {
+    const user = userEvent.setup()
+    signIn.mockResolvedValueOnce({ access_token: 'token', merchant_id: 'merchant-1' })
+    render(<LoginPage />)
+
+    await user.type(screen.getByLabelText('Email'), 'merchant@example.com')
+    await user.type(screen.getByLabelText('Password'), 'secret')
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/charge'))
     expect(push).not.toHaveBeenCalled()
   })
 
-  it('routes to /verify when the password check returns an OTP challenge', async () => {
+  it('disables the submit button while submitting', async () => {
     const user = userEvent.setup()
-    signIn.mockResolvedValue({ challenge_id: 'chal-123', expires_in_secs: 600 })
+    let resolveSignIn: (value: unknown) => void = () => {}
+    signIn.mockImplementationOnce(
+      () => new Promise((resolve) => {
+        resolveSignIn = resolve
+      }),
+    )
     render(<LoginPage />)
 
-    await user.type(screen.getByLabelText(/email/i), 'merchant@example.com')
-    await user.type(screen.getByLabelText(/password/i), 'secret-pass')
-    await user.click(screen.getByRole('button', { name: /sign in/i }))
+    await user.type(screen.getByLabelText('Email'), 'merchant@example.com')
+    await user.type(screen.getByLabelText('Password'), 'secret')
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
 
-    expect(push).toHaveBeenCalledWith('/verify?challenge_id=chal-123&flow=login')
-    expect(replace).not.toHaveBeenCalledWith('/charge')
-  })
+    const button = screen.getByRole('button', { name: 'Signing in…' })
+    expect(button).toBeDisabled()
 
-  it('displays the backend error when sign-in fails', async () => {
-    const user = userEvent.setup()
-    signIn.mockRejectedValue(new Error('Invalid credentials'))
-    render(<LoginPage />)
-
-    await user.type(screen.getByLabelText(/email/i), 'merchant@example.com')
-    await user.type(screen.getByLabelText(/password/i), 'wrong-pass')
-    await user.click(screen.getByRole('button', { name: /sign in/i }))
-
-    expect(await screen.findByText('Invalid credentials')).toBeInTheDocument()
+    resolveSignIn({ access_token: 'token', merchant_id: 'merchant-1' })
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/charge'))
   })
 })
