@@ -4,23 +4,24 @@ import { motion } from 'framer-motion'
 import { Wallet, Copy, Check, ExternalLink, BadgeCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import type { KycStatus } from '@/lib/api'
 
 interface WalletInfoProps {
   walletName: string
   walletAddress: string
+  kycStatus?: KycStatus | null
   loading?: boolean
 }
 
-export function WalletInfo({ walletName, walletAddress, loading = false }: WalletInfoProps) {
+export function WalletInfo({
+  walletName,
+  walletAddress,
+  kycStatus = null,
+  loading = false,
+}: WalletInfoProps) {
   const [copied, setCopied] = useState(false)
-  const [isVerified, setIsVerified] = useState(false)
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setIsVerified(localStorage.getItem('isVerified') === 'true')
-    }
-  }, [])
+  const isVerified = kycStatus === 'approved'
 
   const formatAddress = (address: string) => {
     if (address.length <= 10) return address
