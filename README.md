@@ -385,3 +385,8 @@ This project is licensed under the **Apache 2.0 License**. By contributing, you 
 ---
 
 _Built for Africa, Verified by Blockchain. Onramp to the future. Offramp to opportunity._ 🔗🌍
+
+## Handsoff notes
+
+<!-- handsoff-issue-517 -->
+- #517: test(charge): write tests for the charge numpad page
