@@ -6,7 +6,7 @@ import { ArrowLeft, QrCode, ChevronRight, Wallet, StickyNote } from 'lucide-reac
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { RecentRecipients } from './recent-recipients'
+import { RecentRecipients, Contact } from './recent-recipients'
 import { QRScanner } from './qr-scanner'
 import { TransactionConfirmation } from './transaction-confirmation'
 
@@ -108,6 +108,33 @@ export function SendPageClient() {
     await new Promise((resolve) => setTimeout(resolve, 2200))
     setIsSending(false)
     setStep('success')
+
+    if (form.recipient?.address) {
+      try {
+        const STORAGE_KEY = 'aframp_contacts'
+        const stored = localStorage.getItem(STORAGE_KEY)
+        const contacts: Contact[] = stored ? JSON.parse(stored) : []
+
+        const address = form.recipient.address
+        const name =
+          form.recipient.name ||
+          contacts.find((c) => c.address === address)?.name ||
+          `${address.slice(0, 6)}...${address.slice(-4)}`
+        const avatar = form.recipient.avatar || contacts.find((c) => c.address === address)?.avatar
+
+        const filtered = contacts.filter((c) => c.address !== address)
+        const updatedContact: Contact = {
+          id: contacts.find((c) => c.address === address)?.id || `${Date.now()}`,
+          name,
+          address,
+          avatar,
+          createdAt: contacts.find((c) => c.address === address)?.createdAt || new Date().toISOString(),
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([updatedContact, ...filtered]))
+      } catch (err) {
+        console.error('Failed to save contact after send:', err)
+      }
+    }
   }
 
   const isRecipientValid = recipientInput.trim().length > 5
