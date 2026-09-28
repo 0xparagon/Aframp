@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils'
 import { RecentRecipients } from './recent-recipients'
 import { QRScanner } from './qr-scanner'
 import { TransactionConfirmation } from './transaction-confirmation'
+import { type Balance } from '@/lib/api'
+import { formatStroops } from '@/lib/money'
 
 type Step = 'recipient' | 'amount' | 'confirm' | 'success'
 
@@ -27,12 +29,30 @@ export interface SendFormState {
   note: string
 }
 
-export const ASSETS: CryptoAsset[] = [
-  { symbol: 'XLM', name: 'Stellar Lumens', balance: '1,245.00', icon: '✦', color: 'text-sky-400' },
-  { symbol: 'USDC', name: 'USD Coin', balance: '500.00', icon: '$', color: 'text-blue-400' },
-  { symbol: 'BTC', name: 'Bitcoin', balance: '0.0021', icon: '₿', color: 'text-amber-400' },
-  { symbol: 'ETH', name: 'Ethereum', balance: '0.142', icon: 'Ξ', color: 'text-indigo-400' },
+/** Static asset metadata (display icons/colors). Balances are injected at runtime via the `balances` prop. */
+const ASSET_META: Omit<CryptoAsset, 'balance'>[] = [
+  { symbol: 'XLM', name: 'Stellar Lumens', icon: '✦', color: 'text-sky-400' },
+  { symbol: 'USDC', name: 'USD Coin', icon: '$', color: 'text-blue-400' },
+  { symbol: 'BTC', name: 'Bitcoin', icon: '₿', color: 'text-amber-400' },
+  { symbol: 'ETH', name: 'Ethereum', icon: 'Ξ', color: 'text-indigo-400' },
 ]
+
+/**
+ * Build the full CryptoAsset list by merging static metadata with live
+ * balances from the API. Any asset not present in `balances` shows "0".
+ */
+export function buildAssets(balances: Balance[]): CryptoAsset[] {
+  return ASSET_META.map((meta) => {
+    const bal = balances.find((b) => b.asset === meta.symbol)
+    return {
+      ...meta,
+      balance: bal ? formatStroops(bal.available) : '0',
+    }
+  })
+}
+
+/** @deprecated Use `buildAssets(balances)` instead — this constant has hardcoded mock balances. */
+export const ASSETS: CryptoAsset[] = buildAssets([])
 
 const NUMPAD_KEYS = [
   ['1', '2', '3'],
@@ -41,8 +61,14 @@ const NUMPAD_KEYS = [
   ['.', '0', '⌫'],
 ]
 
-export function SendPageClient() {
+export interface SendPageClientProps {
+  /** Live balances from the API. Each asset's `available` stroops are formatted for display. */
+  balances?: Balance[]
+}
+
+export function SendPageClient({ balances = [] }: SendPageClientProps) {
   const router = useRouter()
+  const assets = buildAssets(balances)
   const [step, setStep] = useState<Step>('recipient')
   const [scannerOpen, setScannerOpen] = useState(false)
   const [isSending, setIsSending] = useState(false)
@@ -50,7 +76,7 @@ export function SendPageClient() {
   const [form, setForm] = useState<SendFormState>({
     recipient: null,
     amount: '',
-    asset: ASSETS[0],
+    asset: assets[0],
     note: '',
   })
 
@@ -246,7 +272,7 @@ export function SendPageClient() {
 
               {/* Asset selector */}
               <div className="flex gap-2 mt-1">
-                {ASSETS.map((asset) => (
+                {assets.map((asset) => (
                   <button
                     key={asset.symbol}
                     onClick={() => setForm((prev) => ({ ...prev, asset }))}
