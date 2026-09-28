@@ -5,10 +5,14 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, QrCode, ChevronRight, Wallet, StickyNote } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { cn } from '@/lib/utils'
 import { RecentRecipients } from './recent-recipients'
 import { QRScanner } from './qr-scanner'
 import { TransactionConfirmation } from './transaction-confirmation'
+import { api, ApiError } from '@/lib/api'
+import { parseAmountToStroops } from '@/lib/money'
+import { useAuthenticatedSession } from '@/components/session-provider'
 
 type Step = 'recipient' | 'amount' | 'confirm' | 'success'
 
@@ -43,9 +47,11 @@ const NUMPAD_KEYS = [
 
 export function SendPageClient() {
   const router = useRouter()
+  const { token } = useAuthenticatedSession()
   const [step, setStep] = useState<Step>('recipient')
   const [scannerOpen, setScannerOpen] = useState(false)
   const [isSending, setIsSending] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
   const [recipientInput, setRecipientInput] = useState('')
   const [form, setForm] = useState<SendFormState>({
     recipient: null,
@@ -104,10 +110,41 @@ export function SendPageClient() {
   }
 
   const handleSend = async () => {
+    const destinationAddress = form.recipient?.address
+    if (!destinationAddress) {
+      setSendError('No recipient address provided.')
+      return
+    }
+
+    const amountStroops = parseAmountToStroops(form.amount)
+    if (!amountStroops || amountStroops <= 0n) {
+      setSendError('Invalid amount.')
+      return
+    }
+
     setIsSending(true)
-    await new Promise((resolve) => setTimeout(resolve, 2200))
-    setIsSending(false)
-    setStep('success')
+    setSendError(null)
+
+    try {
+      await api.createRemittance(
+        token,
+        destinationAddress,
+        amountStroops,
+        form.asset.symbol,
+        form.note || undefined
+      )
+      setStep('success')
+    } catch (cause) {
+      const message =
+        cause instanceof ApiError
+          ? cause.message
+          : cause instanceof Error
+            ? cause.message
+            : 'Transaction failed. Please try again.'
+      setSendError(message)
+    } finally {
+      setIsSending(false)
+    }
   }
 
   const isRecipientValid = recipientInput.trim().length > 5
@@ -311,14 +348,26 @@ export function SendPageClient() {
 
         {/* ── Confirm & Success Steps ── */}
         {(step === 'confirm' || step === 'success') && (
-          <TransactionConfirmation
-            form={form}
-            step={step}
-            isSending={isSending}
-            onBack={() => setStep('amount')}
-            onConfirm={handleSend}
-            onDone={() => router.push('/dashboard')}
-          />
+          <>
+            {sendError && (
+              <div className="px-5 pt-2">
+                <Alert variant="destructive">
+                  <AlertDescription>{sendError}</AlertDescription>
+                </Alert>
+              </div>
+            )}
+            <TransactionConfirmation
+              form={form}
+              step={step}
+              isSending={isSending}
+              onBack={() => {
+                setSendError(null)
+                setStep('amount')
+              }}
+              onConfirm={handleSend}
+              onDone={() => router.push('/dashboard')}
+            />
+          </>
         )}
       </div>
 
