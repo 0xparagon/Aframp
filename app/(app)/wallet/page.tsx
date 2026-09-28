@@ -19,12 +19,13 @@ export default function WalletPage() {
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
     try {
-      setWallet(await api.getWallet(token))
+      setWallet(await api.getWallet(token, signal))
       setError(null)
     } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
       // 400 "no wallet created yet" is the expected state for a new merchant.
       if (cause instanceof ApiError && cause.status === 400) setWallet(null)
       else if (cause instanceof ApiError && cause.status === 0)
@@ -34,22 +35,26 @@ export default function WalletPage() {
       setLoading(false)
     }
     try {
-      setBalances(await api.getBalances(token))
+      setBalances(await api.getBalances(token, signal))
     } catch {
       // Non-fatal: the address above is what matters if this fails.
     }
   }, [token])
 
   useEffect(() => {
-    void load()
+    const controller = new AbortController()
+    void load(controller.signal)
+    return () => controller.abort()
   }, [load])
 
   async function createWallet() {
+    const controller = new AbortController()
     setCreating(true)
     setError(null)
     try {
-      setWallet(await api.createWallet(token))
+      setWallet(await api.createWallet(token, controller.signal))
     } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
       setError(cause instanceof Error ? cause.message : 'Could not set up your address')
     } finally {
       setCreating(false)
