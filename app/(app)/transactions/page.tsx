@@ -123,7 +123,7 @@ export default function TransactionsPage() {
       <header className="space-y-3">
         <h1 className="text-2xl font-bold tracking-tight">Payments</h1>
         {balances.length > 0 && (
-          <ul className="grid gap-2 sm:grid-cols-2">
+          <ul aria-live="polite" aria-atomic="true" className="grid gap-2 sm:grid-cols-2">
             {balances.map((balance) => (
               <li
                 key={balance.asset}
@@ -178,7 +178,12 @@ export default function TransactionsPage() {
                     {refundingId === payment.id ? 'Refunding…' : 'Refund'}
                   </Button>
                 )}
-                <Badge variant={statusVariant(payment.status)}>
+                <Badge
+                  variant={statusVariant(payment.status)}
+                  role="status"
+                  aria-live="polite"
+                  aria-label={`Payment status: ${STATUS_LABEL[payment.status] ?? payment.status}`}
+                >
                   {STATUS_LABEL[payment.status] ?? payment.status}
                 </Badge>
               </div>
@@ -198,7 +203,12 @@ export default function TransactionsPage() {
                 <span className="tabular-nums font-medium">
                   {formatStroops(refund.amount_stroops)} {refund.asset}
                 </span>
-                <Badge variant={refund.status === 'completed' ? 'default' : 'secondary'}>
+                <Badge
+                  variant={refund.status === 'completed' ? 'default' : 'secondary'}
+                  role="status"
+                  aria-live="polite"
+                  aria-label={`Refund status: ${refund.status}`}
+                >
                   {refund.status}
                 </Badge>
               </li>
