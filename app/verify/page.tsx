@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { useSession } from '@/components/session-provider'
 import { ApiError, isOffline } from '@/lib/api'
+import { CHALLENGE_SESSION_KEY } from '@/app/login/page'
 
 const CODE_LENGTH = 6
 
@@ -40,8 +41,10 @@ function VerifyOtpForm() {
   const { session, ready, completeOtp } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const challengeId = searchParams.get('challenge_id')
   const flow: Flow = searchParams.get('flow') === 'signup' ? 'signup' : 'login'
+
+  // #638: read challenge_id from sessionStorage instead of the URL
+  const [challengeId, setChallengeId] = useState<string | null>(null)
 
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -54,12 +57,16 @@ function VerifyOtpForm() {
     if (ready && session) router.replace('/charge')
   }, [ready, session, router])
 
-  // There's no OTP flow without a challenge to verify — someone landed here
-  // directly (bookmark, back button after completing it) rather than via
-  // signup/login handing one off.
+  // Read challenge_id from sessionStorage on mount. If missing, the user
+  // arrived here directly (bookmark, back button) — send them to login.
   useEffect(() => {
-    if (!challengeId) router.replace('/login')
-  }, [challengeId, router])
+    const stored = sessionStorage.getItem(CHALLENGE_SESSION_KEY)
+    if (!stored) {
+      router.replace('/login')
+    } else {
+      setChallengeId(stored)
+    }
+  }, [router])
 
   useEffect(() => {
     codeInputRef.current?.focus()
@@ -79,9 +86,13 @@ function VerifyOtpForm() {
     setSubmitting(true)
     try {
       await completeOtp(challengeId, code.trim())
+      // #638: clear the challenge_id from sessionStorage on success
+      sessionStorage.removeItem(CHALLENGE_SESSION_KEY)
       router.replace('/charge')
     } catch (cause) {
+      // #638: clear the challenge_id from sessionStorage on terminal failure
       if (cause instanceof ApiError && cause.code && TERMINAL_CODES.has(cause.code)) {
+        sessionStorage.removeItem(CHALLENGE_SESSION_KEY)
         setTerminal(true)
         setError(
           cause.code === 'OTP_LOCKED'

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import SignupPage from './page'
 import { useSession } from '@/components/session-provider'
 import { useRouter } from 'next/navigation'
+import { CHALLENGE_SESSION_KEY } from '@/app/login/page'
 
 jest.mock('@/components/session-provider', () => ({
   useSession: jest.fn(),
@@ -21,6 +22,7 @@ describe('SignupPage', () => {
     replace.mockReset()
     push.mockReset()
     signUp.mockReset()
+    sessionStorage.clear()
     ;(useRouter as jest.Mock).mockReturnValue({ replace, push })
     ;(useSession as jest.Mock).mockReturnValue({
       session: null,
@@ -50,7 +52,7 @@ describe('SignupPage', () => {
     expect(signUp).not.toHaveBeenCalled()
   })
 
-  it('calls signUp with the entered values and routes to /verify with the challenge', async () => {
+  it('stores challenge_id in sessionStorage and routes to /verify without it in the URL', async () => {
     const user = userEvent.setup()
     signUp.mockResolvedValue({ challenge_id: 'chal-456', expires_in_secs: 600 })
     render(<SignupPage />)
@@ -62,7 +64,10 @@ describe('SignupPage', () => {
     await user.click(screen.getByRole('button', { name: /create account/i }))
 
     expect(signUp).toHaveBeenCalledWith('hello@acme.com', 'verysecret', 'Acme Pay', '08011122233')
-    expect(push).toHaveBeenCalledWith('/verify?challenge_id=chal-456&flow=signup')
+    // challenge_id must be in sessionStorage, NOT in the URL
+    expect(sessionStorage.getItem(CHALLENGE_SESSION_KEY)).toBe('chal-456')
+    expect(push).toHaveBeenCalledWith('/verify?flow=signup')
+    expect(push).not.toHaveBeenCalledWith(expect.stringContaining('challenge_id'))
     expect(replace).not.toHaveBeenCalledWith('/charge')
   })
 

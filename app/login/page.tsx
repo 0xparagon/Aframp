@@ -9,7 +9,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useSession } from '@/components/session-provider'
-import { isOffline } from '@/lib/api'
+import { ApiError, isOffline } from '@/lib/api'
+
+export const CHALLENGE_SESSION_KEY = 'aframp.challenge_id'
 
 export default function LoginPage() {
   const { session, ready, signIn } = useSession()
@@ -18,6 +20,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [offline, setOffline] = useState(false)
+  const [rateLimited, setRateLimited] = useState(false)
+  const [retryAfter, setRetryAfter] = useState<number | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
@@ -28,6 +32,8 @@ export default function LoginPage() {
     event.preventDefault()
     setError(null)
     setOffline(false)
+    setRateLimited(false)
+    setRetryAfter(null)
 
     if (!email.trim() || !password.trim()) {
       setError('Please enter both your email and password.')
@@ -39,13 +45,25 @@ export default function LoginPage() {
     try {
       const result = await signIn(email.trim(), password)
       if ('challenge_id' in result) {
-        router.push(`/verify?challenge_id=${result.challenge_id}&flow=login`)
+        // #638: store challenge_id in sessionStorage instead of the URL
+        sessionStorage.setItem(CHALLENGE_SESSION_KEY, result.challenge_id)
+        router.push('/verify?flow=login')
       } else {
         router.replace('/charge')
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Sign in failed')
-      setOffline(isOffline(cause))
+      // #637: handle 429 rate-limit separately with clear guidance
+      if (cause instanceof ApiError && cause.status === 429) {
+        setRateLimited(true)
+        // Parse Retry-After header value if the backend embeds it in the
+        // error code, e.g. code = "RETRY_AFTER_60"
+        const match = typeof cause.code === 'string' ? cause.code.match(/(\d+)/) : null
+        setRetryAfter(match ? parseInt(match[1], 10) : null)
+        setError(null)
+      } else {
+        setError(cause instanceof Error ? cause.message : 'Sign in failed')
+        setOffline(isOffline(cause))
+      }
       setSubmitting(false)
     }
   }
@@ -58,7 +76,16 @@ export default function LoginPage() {
       </header>
 
       <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-4">
-        {error && (
+        {rateLimited && (
+          <Alert variant="destructive" role="alert">
+            <AlertDescription>
+              Too many sign-in attempts. Please wait
+              {retryAfter != null ? ` ${retryAfter} seconds` : ' a moment'} before trying again.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {error && !rateLimited && (
           <Alert variant={offline ? 'notice' : 'destructive'}>
             {offline && <WifiOff className="size-4" aria-hidden />}
             <AlertDescription>{error}</AlertDescription>

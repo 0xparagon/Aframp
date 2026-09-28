@@ -10,7 +10,8 @@ import {
   type OtpChallengeResponse,
 } from '@/lib/api'
 
-const STORAGE_KEY = 'aframp.session'
+// #633: token is now stored in an HTTP-only cookie via /api/session,
+// not in localStorage. No token is ever readable by client-side JS.
 
 interface Session {
   token: string
@@ -20,7 +21,7 @@ interface Session {
 
 interface SessionContextValue {
   session: Session | null
-  /** False until localStorage has been read — guards against redirecting on first paint. */
+  /** False until the cookie has been read from the server — guards against redirecting on first paint. */
   ready: boolean
   /** Returns the raw result so the caller can branch: a session (legacy
    * no-phone accounts) vs a challenge (everyone else) that needs `/verify`. */
@@ -45,29 +46,42 @@ function toSession(response: AuthResponse): Session {
   }
 }
 
+/** Persist the session to the HTTP-only cookie via the API route. */
+async function persistCookie(next: Session): Promise<void> {
+  await fetch('/api/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(next),
+  })
+}
+
+/** Clear the HTTP-only cookie. */
+async function clearCookie(): Promise<void> {
+  await fetch('/api/session', { method: 'DELETE' })
+}
+
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [ready, setReady] = useState(false)
   const [me, setMe] = useState<Me | null>(null)
 
+  // #633: on mount, read the session from the HTTP-only cookie via
+  // /api/session (GET). This replaces the localStorage read.
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(STORAGE_KEY)
-      if (stored) setSession(JSON.parse(stored) as Session)
-    } catch {
-      window.localStorage.removeItem(STORAGE_KEY)
-    }
-    setReady(true)
+    fetch('/api/session')
+      .then((res) => res.json() as Promise<{ session: Session | null }>)
+      .then(({ session: stored }) => {
+        if (stored) setSession(stored)
+      })
+      .catch(() => {
+        // Network error on startup — start with no session.
+      })
+      .finally(() => setReady(true))
   }, [])
 
-  const persist = useCallback((next: Session) => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-    } catch {
-      // Storage may be unavailable (private mode, quota, blocked) — the
-      // session still works for this tab, it just won't survive a reload.
-    }
+  const persist = useCallback(async (next: Session) => {
     setSession(next)
+    await persistCookie(next)
   }, [])
 
   const signIn = useCallback(
@@ -75,7 +89,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       const result = await api.login(email, password)
       // Only a legacy no-phone account gets a session straight away; a
       // challenge means the caller still has to route to `/verify`.
-      if ('token' in result) persist(toSession(result))
+      if ('token' in result) await persist(toSession(result))
       return result
     },
     [persist]
@@ -87,7 +101,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const completeOtp = useCallback(
     async (challengeId: string, code: string) => {
-      persist(toSession(await api.verifyOtp(challengeId, code)))
+      await persist(toSession(await api.verifyOtp(challengeId, code)))
     },
     [persist]
   )
@@ -96,7 +110,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     // Best-effort: a failed logout call shouldn't block clearing the local
     // session, but it's the only thing that clears the server-side cookie.
     if (session) api.logout(session.token).catch(() => {})
-    window.localStorage.removeItem(STORAGE_KEY)
+    clearCookie().catch(() => {})
     setSession(null)
     setMe(null)
   }, [session])
