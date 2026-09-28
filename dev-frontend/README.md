@@ -42,6 +42,40 @@ any push or PR on this branch that touches a protected main-frontend path.
 5. Once reviewed and approved, a maintainer will cherry-pick or merge your
    changes into `main` with full test coverage.
 
+## Docker Development
+
+Run these commands from the repository root. The development Compose service
+bind-mounts the whole repository (`.:/app`), so this directory is available at
+`/app/dev-frontend` in the container. Changes under the mount are visible to
+Next.js for hot reload, and the same workspace is available to TypeScript.
+
+1. Create the environment file required by Compose and set `NEXT_API_URL` to a
+   backend reachable from the container:
+
+   ```bash
+   cp .env.example .env.local
+   ```
+
+2. Build and start the development service:
+
+   ```bash
+   docker compose -f docker-compose.dev.yml up --build aframp-dev
+   ```
+
+3. Open the frontend at [http://localhost:3001](http://localhost:3001). To run
+   the TypeScript check inside the container, use:
+
+   ```bash
+   docker compose -f docker-compose.dev.yml exec aframp-dev npm run type-check
+   ```
+
+4. Follow logs in another terminal or stop the service:
+
+   ```bash
+   docker compose -f docker-compose.dev.yml logs -f aframp-dev
+   docker compose -f docker-compose.dev.yml down
+   ```
+
 ## Questions?
 
 Open an issue on GitHub or ping a maintainer in the PR.
