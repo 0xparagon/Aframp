@@ -195,3 +195,94 @@ describe('WithdrawPage', () => {
     )
   })
 })
+
+describe('session-provider authentication logic', () => {
+  const mockPush = jest.fn()
+
+  beforeEach(() => {
+    jest.resetModules()
+    jest.clearAllMocks()
+  })
+
+  it('useAuthenticatedSession throws when no token is in context', () => {
+    jest.isolateModules(() => {
+      const React = jest.requireActual('react')
+      const { renderHook } = jest.requireActual('@testing-library/react')
+      const { useAuthenticatedSession } = jest.requireActual(
+        '@/components/session-provider'
+      )
+
+      const wrapper = ({ children }: { children: React.ReactNode }) =>
+        React.createElement(React.Fragment, null, children)
+
+      expect(() => renderHook(() => useAuthenticatedSession(), { wrapper })).toThrow()
+    })
+  })
+
+  it('registers setUnauthorizedHandler on mount and clears it on unmount', () => {
+    jest.isolateModules(() => {
+      const React = jest.requireActual('react')
+      const { render } = jest.requireActual('@testing-library/react')
+      const { SessionProvider } = jest.requireActual('@/components/session-provider')
+
+      const setUnauthorizedHandler = jest.fn()
+      const clearUnauthorizedHandler = jest.fn()
+
+      const { unmount } = render(
+        React.createElement(
+          SessionProvider,
+          {
+            token: 'test-token',
+            setUnauthorizedHandler,
+            clearUnauthorizedHandler,
+          } as any,
+          React.createElement('div', null, 'child')
+        )
+      )
+
+      expect(setUnauthorizedHandler).toHaveBeenCalledTimes(1)
+      expect(typeof setUnauthorizedHandler.mock.calls[0][0]).toBe('function')
+
+      unmount()
+
+      expect(clearUnauthorizedHandler).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('a 401 response triggers logout and redirect to /login', async () => {
+    jest.isolateModules(() => {
+      const React = jest.requireActual('react')
+      const { render, act } = jest.requireActual('@testing-library/react')
+      const { SessionProvider } = jest.requireActual('@/components/session-provider')
+
+      let handler: ((error: unknown) => void) | undefined
+      const setUnauthorizedHandler = jest.fn((fn: (error: unknown) => void) => {
+        handler = fn
+      })
+      const clearUnauthorizedHandler = jest.fn()
+      const logout = jest.fn()
+
+      render(
+        React.createElement(
+          SessionProvider,
+          {
+            token: 'test-token',
+            logout,
+            setUnauthorizedHandler,
+            clearUnauthorizedHandler,
+          } as any,
+          React.createElement('div', null, 'child')
+        )
+      )
+
+      expect(handler).toBeDefined()
+
+      act(() => {
+        handler!(new ApiError('unauthorized', 401))
+      })
+
+      expect(logout).toHaveBeenCalledTimes(1)
+      expect(mockPush).toHaveBeenCalledWith('/login')
+    })
+  })
+})
