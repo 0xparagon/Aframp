@@ -13,7 +13,13 @@ import { TopAssets } from '@/components/wallet/top-assets'
 import { ErrorState } from '@/components/ui/error-state'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { OnboardingChecklist } from '@/components/onboarding/onboarding-checklist'
-import { api, type Balance, type Payment, type PaymentRequest } from '@/lib/api'
+import {
+  api,
+  DEFAULT_TRANSACTION_LIMIT,
+  type Balance,
+  type Payment,
+  type PaymentRequest,
+} from '@/lib/api'
 import { isAbortError } from '@/lib/utils'
 import { useAuthenticatedSession } from '@/components/session-provider'
 
@@ -30,7 +36,7 @@ export default function HomePage() {
       try {
         const [nextBalances, nextPayments, requests] = await Promise.all([
           api.getBalances(token, signal),
-          api.listTransactions(token, 50, signal),
+          api.listTransactions(token, DEFAULT_TRANSACTION_LIMIT, signal),
           api.listPaymentRequests(token, 20, signal),
         ])
         setBalances(nextBalances)
