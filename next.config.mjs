@@ -5,17 +5,6 @@ import withBundleAnalyzer from '@next/bundle-analyzer'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // PWA configuration (next-pwa v2 reads options from the `pwa` key)
-  pwa: {
-    dest: 'public',
-    register: true,
-    // skipWaiting: false — do NOT force immediate service worker updates.
-    // A waiting SW activates only after the user dismisses the update banner
-    // (see components/pwa-update-banner.tsx), preventing in-flight payment
-    // flows from being interrupted.
-    skipWaiting: false,
-    disable: process.env.NODE_ENV === 'development',
-  },
   experimental: {
     // Limit concurrency only in resource-constrained CI environments.
     // Set CI_LOW_RESOURCES=1 in your CI pipeline to enable these caps;
@@ -77,15 +66,20 @@ const nextConfig = {
   },
 }
 
-// next-pwa@5.6.0 is incompatible with Next.js 15's webpack runtime and causes
-// "a[d] is not a function" errors during SSR prerendering in production builds.
-// Disable it until the project upgrades to @ducanh2912/next-pwa or similar.
+// The service worker is off in development and on everywhere else. If
+// next-pwa@5.6.0 trips over Next.js 15's webpack runtime ("a[d] is not a
+// function" during SSR prerendering), set DISABLE_PWA=1 for that build as a
+// stop-gap and migrate to @ducanh2912/next-pwa.
 const withPWA = withPWAInit({
   dest: 'public',
   register: true,
-  skipWaiting: true,
+  // skipWaiting: false — do NOT force immediate service worker updates.
+  // A waiting SW activates only after the user dismisses the update banner
+  // (see components/pwa-update-banner.tsx), preventing in-flight payment
+  // flows from being interrupted.
+  skipWaiting: false,
   reloadOnOnline: false,
-  disable: true, // was: process.env.NODE_ENV === 'development'
+  disable: process.env.NODE_ENV === 'development' || process.env.DISABLE_PWA === '1',
   runtimeCaching: [
     {
       urlPattern: /\/api\/(?:exchange-rate|rates)(?:\/)?(?:\?.*)?$/,
