@@ -14,8 +14,9 @@ type UUID = string
 const BASE_URL = '/backend'
 
 /**
- * Amount fields are `i64` on the wire. JSON.parse would silently round anything
- * past 2^53, so these keys are re-quoted before parsing and revived as bigint.
+ * Every backend wire field carrying a large integer must be listed here.
+ * JSON.parse would silently round values past 2^53, so keep this set in sync
+ * with the field-name alternatives in parseWithBigInts' pre-parse regex.
  */
 const BIGINT_KEYS = new Set(['amount_stroops', 'available', 'pending', 'fee_stroops', 'network_fee_stroops', 'total_stroops'])
 
@@ -343,8 +344,13 @@ export interface PushSubscriptionStatus {
   enabled: boolean
 }
 
+/**
+ * Re-quotes large integer values before JSON.parse can round them, then revives
+ * registered fields as bigint. When adding a key to BIGINT_KEYS, also add it
+ * to the field-name alternatives in this regex; see lib/__tests__/api.test.ts.
+ */
 export function parseWithBigInts<T>(text: string): T {
-  const quoted = text.replace(/"(amount_stroops|available|pending)"\s*:\s*(-?\d+)/g, '"$1":"$2"')
+  const quoted = text.replace(/"(amount_stroops|available|pending|fee_stroops|network_fee_stroops|total_stroops)"\s*:\s*(-?\d+)/g, '"$1":"$2"')
   return JSON.parse(quoted, (key, value) =>
     BIGINT_KEYS.has(key) && typeof value === 'string' ? BigInt(value) : value
   ) as T
