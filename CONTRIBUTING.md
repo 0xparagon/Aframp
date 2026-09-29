@@ -7,6 +7,7 @@ Thank you for your interest in contributing to AFRAMP! This guide will help you 
 - [Getting Started](#getting-started)
 - [Contributing via dev-frontend](#contributing-via-dev-frontend)
 - [Development Workflow](#development-workflow)
+- [Contributing via dev-frontend](#contributing-via-dev-frontend)
 - [Code Standards](#code-standards)
 - [Testing](#testing)
 - [Submitting Changes](#submitting-changes)
@@ -170,6 +171,52 @@ git push origin feature/your-feature-name
 3. Select your branch
 4. Fill in PR template
 5. Submit for review
+
+---
+
+## Contributing via dev-frontend
+
+If you want to build or experiment with frontend features **without touching the production frontend**, use the `dev-frontend` branch. It is a sandboxed workflow designed to prevent accidental changes to production files.
+
+### The sandbox directory
+
+All work on this branch lives inside the [`dev-frontend/`](dev-frontend/) directory. Create your own feature folder there (e.g. `dev-frontend/my-feature/`) for new components, pages, hooks, tests, and docs. You may read the main frontend code for reference, but must not edit it.
+
+See [`dev-frontend/README.md`](dev-frontend/README.md) for full setup instructions and rules.
+
+### Protected paths
+
+The following paths are the production codebase and **must not be modified** from the `dev-frontend` branch:
+
+| Protected path | Contents |
+|----------------|----------|
+| `app/` | Next.js routes and pages |
+| `components/` | Shared UI components |
+| `lib/` | Core libraries and utilities |
+| `hooks/` | Shared React hooks |
+| `styles/` | Global styles |
+| `public/` | Static assets |
+| `types/` | Shared TypeScript types |
+| `next.config.mjs` | Next.js configuration |
+| `next-env.d.ts` | Next.js type declarations |
+
+### Guard CI
+
+The workflow [`.github/workflows/dev-frontend-guard.yml`](.github/workflows/dev-frontend-guard.yml) runs on every push to, and every pull request targeting, `dev-frontend`. It diffs the changed files and **fails the check** if any file matches a protected path, listing the offending files in the job output. If it fails, revert those changes (e.g. `git checkout upstream/dev-frontend -- <file>`) and move your work into `dev-frontend/`.
+
+Once reviewed and approved, a maintainer will merge or cherry-pick sandbox work into `main` with full test coverage.
+
+### Quick-start checklist
+
+- [ ] Fork the repo and clone your fork
+- [ ] Add the upstream remote: `git remote add upstream https://github.com/kellymusk/Aframp.git`
+- [ ] Branch from `dev-frontend`: `git fetch upstream && git checkout -b feat/my-feature upstream/dev-frontend`
+- [ ] Read [`dev-frontend/README.md`](dev-frontend/README.md)
+- [ ] Create your feature folder: `mkdir dev-frontend/my-feature`
+- [ ] Keep all changes inside `dev-frontend/` (check with `git diff --name-only upstream/dev-frontend`)
+- [ ] Use [conventional commits](#3-commit-changes)
+- [ ] Open your PR against the **`dev-frontend`** branch (not `main`)
+- [ ] Confirm the **Dev-Frontend Guard** check passes
 
 ---
 
