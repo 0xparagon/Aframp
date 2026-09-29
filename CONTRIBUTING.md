@@ -5,6 +5,7 @@ Thank you for your interest in contributing to AFRAMP! This guide will help you 
 ## Table of Contents
 
 - [Getting Started](#getting-started)
+- [Contributing via dev-frontend](#contributing-via-dev-frontend)
 - [Development Workflow](#development-workflow)
 - [Code Standards](#code-standards)
 - [Testing](#testing)
@@ -56,6 +57,27 @@ For the backend client contract used by the frontend, see the OpenAPI spec in [o
    ```bash
    git checkout -b feature/your-feature-name
    ```
+
+---
+
+## Contributing via dev-frontend
+
+The `dev-frontend` branch provides an isolated sandbox for frontend contributions that should not modify the production frontend. Keep your work inside `dev-frontend/`; use the main frontend only as a read-only reference. See the [dev-frontend README](dev-frontend/README.md) for setup instructions.
+
+The following production paths are protected on this branch:
+
+- `app/`, `components/`, `lib/`, `hooks/`, `styles/`, `public/`, and `types/`
+- `next.config.mjs` and `next-env.d.ts`
+
+The [Dev-Frontend Guard](.github/workflows/dev-frontend-guard.yml) CI workflow runs for pushes to `dev-frontend` and pull requests targeting `dev-frontend`. It fails when a change touches any protected path above. Move sandbox work into `dev-frontend/` if the guard reports a violation.
+
+### Quick start
+
+- [ ] Clone the repository or your fork and check out the `dev-frontend` branch.
+- [ ] Follow the setup instructions in [dev-frontend/README.md](dev-frontend/README.md).
+- [ ] Create your feature or page under `dev-frontend/`.
+- [ ] Keep production paths listed above unchanged; refer to them read-only if needed.
+- [ ] Push your branch and open a pull request targeting `dev-frontend`.
 
 ---
 
