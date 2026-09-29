@@ -14,6 +14,7 @@ import { ErrorState } from '@/components/ui/error-state'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { OnboardingChecklist } from '@/components/onboarding/onboarding-checklist'
 import { api, type Balance, type Payment, type PaymentRequest } from '@/lib/api'
+import { isAbortError } from '@/lib/utils'
 import { useAuthenticatedSession } from '@/components/session-provider'
 
 export default function HomePage() {
@@ -36,7 +37,7 @@ export default function HomePage() {
         setPayments(nextPayments)
         setOpenRequests(requests.filter((request) => request.status === 'pending'))
       } catch (cause) {
-        if (cause instanceof DOMException && cause.name === 'AbortError') return
+        if (isAbortError(cause)) return
         setError(cause instanceof Error ? cause.message : 'Could not load your dashboard')
         setBalances([])
       }
