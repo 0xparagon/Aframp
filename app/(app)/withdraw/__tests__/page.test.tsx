@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { api, ApiError } from '@/lib/api'
 import WithdrawPage from '../page'
@@ -40,6 +40,7 @@ jest.mock('@/components/ui/select', () => {
           disabled,
           onChange: (event: any) => onValueChange(event.target.value),
         },
+        value === '' ? React.createElement('option', { value: '' }, '') : null,
         children
       ),
     SelectTrigger: () => null,
@@ -112,10 +113,15 @@ describe('WithdrawPage', () => {
   it('shows an asset selector when multiple assets have balances', async () => {
     mockGetBalances.mockResolvedValue([
       balance('cNGN', 10_000_000_000n),
-      balance('cKES', 5_000_000_000n),
+      balance('cKES', 0n),
+      balance('cGHS', 5_000_000_000n),
     ])
     render(<WithdrawPage />)
-    expect(await screen.findByText('Asset')).toBeInTheDocument()
+    await screen.findByText('Asset')
+    const assetSelector = screen.getAllByRole('combobox')[0]
+    expect(within(assetSelector).getByRole('option', { name: 'cNGN' })).toBeInTheDocument()
+    expect(within(assetSelector).getByRole('option', { name: 'cGHS' })).toBeInTheDocument()
+    expect(within(assetSelector).queryByRole('option', { name: 'cKES' })).not.toBeInTheDocument()
   })
 
   it('rejects an amount with more than two decimals', async () => {
@@ -172,7 +178,7 @@ describe('WithdrawPage', () => {
     expect(await screen.findByText('Account numbers are 10 digits.')).toBeInTheDocument()
   })
 
-  it('submits a valid cash-out', async () => {
+  it('submits a valid cash-out and resets the form', async () => {
     const user = userEvent.setup()
     mockGetBalances.mockResolvedValue([balance('cNGN', 10_000_000_000n)])
     render(<WithdrawPage />)
@@ -193,5 +199,26 @@ describe('WithdrawPage', () => {
         'cNGN'
       )
     )
+    await waitFor(() => {
+      expect(screen.getByLabelText('Amount (cNGN)')).toHaveValue('')
+      expect(screen.getByLabelText('Account number')).toHaveValue('')
+      expect(screen.getByRole('combobox')).toHaveValue('')
+    })
+  })
+
+  it('shows a backend submission error in the alert', async () => {
+    const user = userEvent.setup()
+    mockGetBalances.mockResolvedValue([balance('cNGN', 10_000_000_000n)])
+    mockCreateWithdrawal.mockRejectedValue(new Error('Bank provider unavailable'))
+    render(<WithdrawPage />)
+
+    await screen.findByRole('heading', { name: 'Cash out' })
+    await user.type(screen.getByLabelText('Amount (cNGN)'), '50')
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '044' } })
+    await user.type(screen.getByLabelText('Account number'), '0123456789')
+    await user.click(screen.getByRole('button', { name: 'Cash out' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Bank provider unavailable')
   })
 })
