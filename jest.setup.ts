@@ -3,6 +3,9 @@ import { Blob, File } from 'buffer'
 import { ReadableStream, TransformStream, WritableStream } from 'stream/web'
 import { MessageChannel, MessagePort, BroadcastChannel } from 'worker_threads'
 import '@testing-library/jest-dom'
+import { toHaveNoViolations } from 'jest-axe'
+
+expect.extend(toHaveNoViolations)
 
 // Set TextEncoder/Decoder and Streams/Message globals first because undici needs them on load
 global.TextDecoder = TextDecoder as any

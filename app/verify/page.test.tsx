@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import { axe } from 'jest-axe'
 import userEvent from '@testing-library/user-event'
 import VerifyOtpPage from './page'
 import { useSession } from '@/components/session-provider'
@@ -40,12 +41,13 @@ describe('VerifyOtpPage', () => {
     expect(replace).toHaveBeenCalledWith('/login')
   })
 
-  it('renders the code form when a challenge_id is present', () => {
+  it('renders an accessible code form when a challenge_id is present', async () => {
     ;(useSearchParams as jest.Mock).mockReturnValue(paramsWith({ challenge_id: 'chal-1', flow: 'login' }))
-    render(<VerifyOtpPage />)
+    const { container } = render(<VerifyOtpPage />)
 
     expect(screen.getByLabelText(/6-digit code/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /verify/i })).toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
   })
 
   it('submits the code against the challenge and redirects to /charge on success', async () => {

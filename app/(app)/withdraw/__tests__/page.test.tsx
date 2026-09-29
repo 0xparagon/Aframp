@@ -1,4 +1,5 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { axe } from 'jest-axe'
 import userEvent from '@testing-library/user-event'
 import { api, ApiError } from '@/lib/api'
 import WithdrawPage from '../page'
@@ -31,21 +32,58 @@ jest.mock('@/components/session-provider', () => ({
 // through ordinary DOM events in jsdom.
 jest.mock('@/components/ui/select', () => {
   const React = jest.requireActual('react')
+
+  const SelectTrigger = ({ id, children }: any) =>
+    React.createElement('div', { id, 'data-select-trigger': true }, children)
+
+  const SelectValue = ({ placeholder }: any) => React.createElement('span', null, placeholder ?? '')
+
+  const SelectItem = ({ value, children }: any) =>
+    React.createElement('option', { value }, children)
+
+  const SelectContent = ({ children }: any) =>
+    React.createElement(React.Fragment, null, children)
+
+  const flattenOptions = (nodes: any): any[] =>
+    React.Children.toArray(nodes).flatMap((node: any) => {
+      if (!React.isValidElement(node)) return []
+      if (node.type === SelectItem) return [node]
+      if (node.type === SelectContent) return flattenOptions(node.props.children)
+      if (node.props?.children) return flattenOptions(node.props.children)
+      return []
+    })
+
   return {
-    Select: ({ value, onValueChange, disabled, children }: any) =>
-      React.createElement(
+    Select: ({ value, onValueChange, disabled, children }: any) => {
+      const trigger = React.Children.toArray(children).find(
+        (child: any) => React.isValidElement(child) && child.type === SelectTrigger
+      ) as any
+      const options = flattenOptions(children).map((option: any) =>
+        React.createElement(
+          'option',
+          { key: option.props.value, value: option.props.value },
+          option.props.children
+        )
+      )
+
+      return React.createElement(
         'select',
         {
-          value,
+          id: trigger?.props.id,
+          value: value ?? '',
           disabled,
-          onChange: (event: any) => onValueChange(event.target.value),
+          onChange: (event: any) => onValueChange?.(event.target.value),
+          role: 'combobox',
+          'aria-expanded': 'false',
+          'aria-controls': `${trigger?.props.id ?? 'select'}-list`,
         },
-        children
-      ),
-    SelectTrigger: () => null,
-    SelectValue: () => null,
-    SelectContent: ({ children }: any) => children,
-    SelectItem: ({ value, children }: any) => React.createElement('option', { value }, children),
+        options
+      )
+    },
+    SelectTrigger,
+    SelectValue,
+    SelectContent,
+    SelectItem,
   }
 })
 
@@ -93,6 +131,14 @@ describe('WithdrawPage', () => {
   it('shows a no-balance message when nothing can be cashed out', async () => {
     render(<WithdrawPage />)
     expect(await screen.findByText(/no balance to cash out/i)).toBeInTheDocument()
+  })
+
+  it('has no accessibility violations in the cash-out form', async () => {
+    mockGetBalances.mockResolvedValue([balance('cNGN', 10_000_000_000n)])
+    const { container } = render(<WithdrawPage />)
+    await screen.findByRole('heading', { name: 'Cash out' })
+
+    expect(await axe(container)).toHaveNoViolations()
   })
 
   it('shows the load error when the backend fails', async () => {
