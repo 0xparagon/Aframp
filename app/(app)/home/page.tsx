@@ -51,6 +51,7 @@ export default function HomePage() {
     return () => controller.abort()
   }, [load])
 
+  // Full-page load failure: use ErrorState with a retry button.
   if (error) return <ErrorState message={error} onRetry={() => void load()} />
   if (!balances) {
     return (
