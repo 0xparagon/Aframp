@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AdminSidebar } from '@/components/admin/admin-sidebar'
 import { useSession } from '@/components/session-provider'
@@ -12,14 +11,9 @@ import { api, ApiError, type Me } from '@/lib/api'
 type GateState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'done' }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { session, ready } = useSession()
-  const router = useRouter()
+  const { session } = useSession()
   const [me, setMe] = useState<Me | null>(null)
   const [gate, setGate] = useState<GateState>({ status: 'loading' })
-
-  useEffect(() => {
-    if (ready && !session) router.replace('/login')
-  }, [ready, session, router])
 
   useEffect(() => {
     if (!session) return
@@ -49,7 +43,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, [session])
 
-  if (!ready || !session || gate.status === 'loading') {
+  if (gate.status === 'loading') {
     return (
       <main className="dark bg-ink flex min-h-dvh items-center justify-center">
         <LoadingSpinner />
@@ -70,8 +64,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <main className="dark bg-ink font-brand flex min-h-dvh flex-col items-center justify-center gap-3 p-6 text-center text-white">
         <h1 className="text-xl font-bold">Admin access required</h1>
         <p className="text-dim max-w-sm text-sm">
-          This account doesn&apos;t have admin privileges. If you believe this is a mistake,
-          contact whoever manages the platform.
+          This account doesn&apos;t have admin privileges. If you believe this is a mistake, contact
+          whoever manages the platform.
         </p>
         <Link
           href="/home"
