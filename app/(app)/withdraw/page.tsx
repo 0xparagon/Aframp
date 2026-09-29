@@ -31,6 +31,8 @@ const STATUS_LABEL: Record<WithdrawalStatus, string> = {
   failed: 'Failed',
 }
 
+const PAGE_SIZE = 20
+
 export default function WithdrawPage() {
   const { token } = useAuthenticatedSession()
   const [balances, setBalances] = useState<Balance[] | null>(null)
@@ -41,13 +43,17 @@ export default function WithdrawPage() {
   const [accountNumber, setAccountNumber] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [limit, setLimit] = useState(PAGE_SIZE)
+  const [loadingMore, setLoadingMore] = useState(false)
+  // The API only takes a limit, so a full page back means there may be older entries.
+  const hasMore = withdrawals.length >= limit
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
       try {
         const [nextBalances, nextWithdrawals] = await Promise.all([
           api.getBalances(token, signal),
-          api.listWithdrawals(token, 20, signal),
+          api.listWithdrawals(token, limit, signal),
         ])
         setBalances(nextBalances)
         setWithdrawals(nextWithdrawals)
@@ -62,7 +68,7 @@ export default function WithdrawPage() {
         setBalances([])
       }
     },
-    [token]
+    [token, limit]
   )
 
   useEffect(() => {
@@ -70,6 +76,19 @@ export default function WithdrawPage() {
     void load(controller.signal)
     return () => controller.abort()
   }, [load])
+
+  async function loadMore() {
+    const nextLimit = limit + PAGE_SIZE
+    setLoadingMore(true)
+    try {
+      setWithdrawals(await api.listWithdrawals(token, nextLimit))
+      setLimit(nextLimit)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not load older cash-outs')
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   const withdrawableAssets = useMemo(() => getWithdrawableAssets(balances ?? []), [balances])
   const config = getWithdrawalAssetConfig(asset)
@@ -269,6 +288,17 @@ export default function WithdrawPage() {
                 </li>
               ))}
             </ul>
+            {hasMore && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={loadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? 'Loading…' : 'Load more'}
+              </Button>
+            )}
           </section>
         )}
       </div>
