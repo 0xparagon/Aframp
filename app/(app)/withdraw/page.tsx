@@ -14,9 +14,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { api, ApiError, type Balance, type Withdrawal, type WithdrawalStatus } from '@/lib/api'
+import { api, ApiError, type Withdrawal, type WithdrawalStatus } from '@/lib/api'
 import { formatStroops, isWholeKobo, parseAmountToStroops } from '@/lib/money'
 import { useAuthenticatedSession } from '@/components/session-provider'
+import { useDataLoader } from '@/hooks/use-data-loader'
 import {
   getBankOptions,
   getWithdrawableAssets,
@@ -31,10 +32,13 @@ const STATUS_LABEL: Record<WithdrawalStatus, string> = {
   failed: 'Failed',
 }
 
+interface WithdrawData {
+  balances: Awaited<ReturnType<typeof api.getBalances>>
+  withdrawals: Withdrawal[]
+}
+
 export default function WithdrawPage() {
   const { token } = useAuthenticatedSession()
-  const [balances, setBalances] = useState<Balance[] | null>(null)
-  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
   const [asset, setAsset] = useState<WithdrawalAsset>('cNGN')
   const [amount, setAmount] = useState('')
   const [bankCode, setBankCode] = useState('')
@@ -42,34 +46,26 @@ export default function WithdrawPage() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  const load = useCallback(
-    async (signal?: AbortSignal) => {
+  const { data, error: loadError, loading, reload } = useDataLoader<WithdrawData>(
+    async (signal) => {
       try {
-        const [nextBalances, nextWithdrawals] = await Promise.all([
+        const [balances, withdrawals] = await Promise.all([
           api.getBalances(token, signal),
           api.listWithdrawals(token, 20, signal),
         ])
-        setBalances(nextBalances)
-        setWithdrawals(nextWithdrawals)
+        return { balances, withdrawals }
       } catch (cause) {
-        if (cause instanceof DOMException && cause.name === 'AbortError') return
         if (cause instanceof ApiError && cause.status === 0) {
-          setError('backend-down')
-          setBalances([])
-          return
+          throw new Error('backend-down')
         }
-        setError(cause instanceof Error ? cause.message : 'Could not load your cash-out details')
-        setBalances([])
+        throw cause
       }
     },
     [token]
   )
 
-  useEffect(() => {
-    const controller = new AbortController()
-    void load(controller.signal)
-    return () => controller.abort()
-  }, [load])
+  const balances = data?.balances ?? null
+  const withdrawals = data?.withdrawals ?? []
 
   const withdrawableAssets = useMemo(() => getWithdrawableAssets(balances ?? []), [balances])
   const config = getWithdrawalAssetConfig(asset)
@@ -118,7 +114,7 @@ export default function WithdrawPage() {
       setAmount('')
       setBankCode('')
       setAccountNumber('')
-      await load()
+      reload()
     } catch (cause) {
       // A 502 carries Paystack's own message — show it rather than a generic one.
       setError(cause instanceof Error ? cause.message : 'Cash-out failed')
@@ -127,7 +123,7 @@ export default function WithdrawPage() {
     }
   }
 
-  if (!balances) {
+  if (loading || !balances) {
     return (
       <div className="flex justify-center py-16">
         <LoadingSpinner />
@@ -158,12 +154,12 @@ export default function WithdrawPage() {
           onSubmit={submit}
           className="bg-panel border-hairline flex flex-col gap-4 rounded-2xl border p-5"
         >
-          {error && (
+          {(error || loadError) && (
             <Alert variant="destructive">
               <AlertDescription>
-                {error === 'backend-down'
+                {(error === 'backend-down' || loadError === 'backend-down')
                   ? "We can't connect to the payment server right now. Please try again in a moment."
-                  : error}
+                  : (error || loadError)}
               </AlertDescription>
             </Alert>
           )}
