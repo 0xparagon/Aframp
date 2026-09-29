@@ -20,10 +20,10 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { ErrorState } from '@/components/ui/error-state'
 import { EmptyStateIllustration } from '@/components/ui/empty-state-illustration'
 import { api, ApiError, type ApiKey } from '@/lib/api'
+import { formatLastUsedAt, isApiKeyUsageStale } from '@/lib/api-key-usage'
 import { useAuthenticatedSession } from '@/components/session-provider'
 
-function formatWhen(iso: string | null): string {
-  if (!iso) return 'Never'
+function formatCreatedAt(iso: string): string {
   return new Date(iso).toLocaleString('en-NG', {
     day: 'numeric',
     month: 'short',
@@ -220,7 +220,11 @@ export default function ApiKeysPage() {
             {keys.map((key) => (
               <li
                 key={key.id}
-                className="flex items-start justify-between gap-4 px-5 py-4"
+                className={`flex items-start justify-between gap-4 px-5 py-4 ${
+                  !key.revoked_at && isApiKeyUsageStale(key.last_used_at)
+                    ? 'border-l-2 border-amber-400 bg-amber-500/5'
+                    : ''
+                }`}
               >
                 <div className="min-w-0 space-y-1">
                   <div className="flex items-center gap-2">
@@ -230,11 +234,19 @@ export default function ApiKeysPage() {
                         Revoked
                       </Badge>
                     )}
+                    {!key.revoked_at && isApiKeyUsageStale(key.last_used_at) && (
+                      <Badge
+                        variant="outline"
+                        className="border-amber-500/30 bg-amber-500/10 text-xs text-amber-200"
+                      >
+                        {key.last_used_at ? 'Inactive 90+ days' : 'Never used'}
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-dim text-xs font-mono">{key.key_preview}</p>
                   <p className="text-dim text-xs">
-                    Created {formatWhen(key.created_at)}
-                    {key.last_used_at && ` · Last used ${formatWhen(key.last_used_at)}`}
+                    Created {formatCreatedAt(key.created_at)} · Last used{' '}
+                    {formatLastUsedAt(key.last_used_at)}
                   </p>
                 </div>
 
