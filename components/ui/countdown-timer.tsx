@@ -4,22 +4,35 @@ import { useEffect, useRef, useState } from 'react'
 import { Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-interface CountdownTimerProps {
+export interface CountdownTimerProps {
+  /** The moment the countdown runs out. */
   expiresAt: Date
+  /** Called once, when the timer first reaches zero. */
   onExpire?: () => void
 }
 
+/** Whole seconds left until `target`, floored and clamped at zero. */
 function secondsUntil(target: Date): number {
   return Math.max(0, Math.floor((target.getTime() - Date.now()) / 1000))
 }
 
+/**
+ * The single "time left" component for the app (see #679).
+ *
+ * This replaces the two divergent copies that used to live at
+ * `components/countdown-timer.tsx` and `components/onramp/countdown-timer.tsx`.
+ * The implementation is the more robust of the two:
+ *
+ * - the remaining time is seeded on first render, so the component never
+ *   flashes "00:00" before the first tick corrects it;
+ * - `onExpire` is held in a ref, so a caller passing an inline arrow does not
+ *   tear down and rebuild the interval on every render;
+ * - the interval clears itself as soon as it hits zero, so `onExpire` fires
+ *   exactly once instead of on every subsequent tick.
+ */
 export function CountdownTimer({ expiresAt, onExpire }: CountdownTimerProps) {
-  // Seeded from the real remaining time, not zero — otherwise the first paint
-  // reads "00:00" for a full second before the interval corrects it.
   const [remaining, setRemaining] = useState(() => secondsUntil(expiresAt))
 
-  // Held in a ref so a caller passing an inline arrow doesn't restart the timer
-  // on every render.
   const onExpireRef = useRef(onExpire)
   useEffect(() => {
     onExpireRef.current = onExpire
