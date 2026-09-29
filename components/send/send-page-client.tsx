@@ -6,19 +6,14 @@ import { ArrowLeft, QrCode, ChevronRight, Wallet, StickyNote } from 'lucide-reac
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { STELLAR_ASSETS, type CryptoAsset } from '@/lib/assets'
 import { RecentRecipients } from './recent-recipients'
 import { QRScanner } from './qr-scanner'
 import { TransactionConfirmation } from './transaction-confirmation'
 
 type Step = 'recipient' | 'amount' | 'confirm' | 'success'
 
-export interface CryptoAsset {
-  symbol: string
-  name: string
-  balance: string
-  icon: string
-  color: string
-}
+export type { CryptoAsset }
 
 export interface SendFormState {
   recipient: { address: string; name?: string; avatar?: string } | null
@@ -27,12 +22,7 @@ export interface SendFormState {
   note: string
 }
 
-export const ASSETS: CryptoAsset[] = [
-  { symbol: 'XLM', name: 'Stellar Lumens', balance: '1,245.00', icon: '✦', color: 'text-sky-400' },
-  { symbol: 'USDC', name: 'USD Coin', balance: '500.00', icon: '$', color: 'text-blue-400' },
-  { symbol: 'BTC', name: 'Bitcoin', balance: '0.0021', icon: '₿', color: 'text-amber-400' },
-  { symbol: 'ETH', name: 'Ethereum', balance: '0.142', icon: 'Ξ', color: 'text-indigo-400' },
-]
+export const ASSETS: CryptoAsset[] = STELLAR_ASSETS
 
 const NUMPAD_KEYS = [
   ['1', '2', '3'],
@@ -221,117 +211,122 @@ export function SendPageClient() {
                 {form.recipient?.name ??
                   `${form.recipient?.address?.slice(0, 8)}...${form.recipient?.address?.slice(-4)}`}
               </span>
-              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground ml-auto" />
             </button>
 
             {/* Amount display */}
-            <div className="flex-1 flex flex-col items-center justify-center gap-2 min-h-[120px] md:min-h-[140px] max-h-[280px] shrink-0 overflow-hidden">
+            <div className="flex flex-col items-center justify-center py-6 gap-1">
               <div className="flex items-baseline gap-2">
-                <span
-                  className={cn(
-                    'font-bold tabular-nums transition-all duration-150',
-                    form.amount.length > 8
-                      ? 'text-3xl'
-                      : form.amount.length > 5
-                        ? 'text-5xl'
-                        : 'text-6xl'
-                  )}
-                >
+                <span className="text-5xl font-bold tracking-tight tabular-nums">
                   {form.amount || '0'}
                 </span>
-                <span className="text-xl font-medium text-muted-foreground">
+                <span className="text-lg font-medium text-muted-foreground">
                   {form.asset.symbol}
                 </span>
               </div>
-
-              {/* Asset selector */}
-              <div className="flex gap-2 mt-1">
-                {ASSETS.map((asset) => (
-                  <button
-                    key={asset.symbol}
-                    onClick={() => setForm((prev) => ({ ...prev, asset }))}
-                    className={cn(
-                      'px-3 py-1 rounded-full text-xs font-semibold border transition-all duration-150',
-                      form.asset.symbol === asset.symbol
-                        ? 'bg-emerald-500 border-emerald-500 text-white'
-                        : 'bg-muted/40 border-border/50 text-muted-foreground hover:border-emerald-500/40'
-                    )}
-                  >
-                    {asset.symbol}
-                  </button>
-                ))}
-              </div>
-
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-xs text-muted-foreground">
                 Balance: {form.asset.balance} {form.asset.symbol}
               </p>
             </div>
 
-            {/* Note field */}
+            {/* Asset selector */}
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {ASSETS.map((asset) => (
+                <button
+                  key={asset.symbol}
+                  onClick={() => setForm((prev) => ({ ...prev, asset }))}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-2 rounded-full border text-sm font-medium whitespace-nowrap transition-colors',
+                    form.asset.symbol === asset.symbol
+                      ? 'border-emerald-500/60 bg-emerald-500/10'
+                      : 'border-border/50 bg-muted/40 hover:border-border'
+                  )}
+                >
+                  <span className={cn('text-base', asset.color)}>{asset.icon}</span>
+                  {asset.symbol}
+                </button>
+              ))}
+            </div>
+
+            {/* Note input */}
             <div className="relative">
-              <StickyNote className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                <StickyNote className="w-4 h-4" />
+              </div>
               <Input
                 value={form.note}
                 onChange={(e) => setForm((prev) => ({ ...prev, note: e.target.value }))}
                 placeholder="Add a note (optional)"
-                className="pl-9 h-10 text-sm bg-muted/30 border-border/50 focus-visible:ring-emerald-500/30"
-                maxLength={80}
+                className="pl-9 h-11 bg-muted/40 border-border/60"
               />
             </div>
 
             {/* Numpad */}
-            <div className="grid grid-cols-3 gap-1.5 mt-auto">
+            <div className="grid grid-cols-3 gap-2 mt-auto">
               {NUMPAD_KEYS.flat().map((key) => (
                 <button
                   key={key}
                   onClick={() => handleNumpad(key)}
-                  className={cn(
-                    'h-14 rounded-xl font-semibold text-lg transition-all duration-100 active:scale-95',
-                    key === '⌫'
-                      ? 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
-                      : 'bg-muted/50 hover:bg-muted/80 active:bg-muted'
-                  )}
+                  className="h-14 rounded-xl bg-muted/40 hover:bg-muted text-xl font-semibold transition-colors active:scale-95"
                 >
                   {key}
                 </button>
               ))}
             </div>
 
-            {/* CTA */}
             <Button
               onClick={() => setStep('confirm')}
               disabled={!isAmountValid}
-              className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold disabled:opacity-40"
+              className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold disabled:opacity-40 transition-all"
             >
-              Review
+              Continue
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
         )}
 
-        {/* ── Confirm & Success Steps ── */}
-        {(step === 'confirm' || step === 'success') && (
+        {/* ── Confirm Step ── */}
+        {step === 'confirm' && (
           <TransactionConfirmation
-            form={form}
-            step={step}
+            recipient={form.recipient}
+            amount={form.amount}
+            asset={form.asset}
+            note={form.note}
             isSending={isSending}
-            onBack={() => setStep('amount')}
             onConfirm={handleSend}
-            onDone={() => router.push('/dashboard')}
+            onBack={() => setStep('amount')}
+          />
+        )}
+
+        {/* ── Success Step ── */}
+        {step === 'success' && (
+          <div className="flex flex-col flex-1 items-center justify-center px-5 gap-4 pb-8">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center">
+              <span className="text-emerald-500 text-3xl">✓</span>
+            </div>
+            <h2 className="text-xl font-semibold">Transaction sent</h2>
+            <p className="text-sm text-muted-foreground text-center">
+              {form.amount} {form.asset.symbol} sent successfully
+            </p>
+            <Button
+              onClick={() => router.push('/dashboard')}
+              className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold mt-4"
+            >
+              Back to dashboard
+            </Button>
+          </div>
+        )}
+
+        {/* QR Scanner */}
+        {scannerOpen && (
+          <QRScanner
+            onClose={() => setScannerOpen(false)}
+            onScan={(address) => {
+              setScannerOpen(false)
+              handleRecipientSelect(address)
+            }}
           />
         )}
       </div>
-
-      {/* QR Scanner overlay */}
-      {scannerOpen && (
-        <QRScanner
-          onScan={(address) => {
-            handleRecipientSelect(address)
-            setScannerOpen(false)
-          }}
-          onClose={() => setScannerOpen(false)}
-        />
-      )}
     </div>
   )
 }
