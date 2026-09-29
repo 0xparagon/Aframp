@@ -6,13 +6,25 @@ import { BadgeCheck, Check, Copy, ExternalLink, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 
-/** Testnet today; swap for `public` when the backend points at mainnet Horizon. */
-const EXPLORER_BASE = 'https://stellar.expert/explorer/testnet/account'
+/**
+ * Stellar explorer base URL.
+ * Reads NEXT_PUBLIC_STELLAR_NETWORK at runtime so the link works for both
+ * testnet development builds and mainnet production builds without any
+ * code change.  Falls back to testnet when the variable is absent (local dev).
+ */
+function explorerBase(): string {
+  const network = process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? 'TESTNET'
+  const segment = network === 'MAINNET' ? 'public' : 'testnet'
+  return `https://stellar.expert/explorer/${segment}/account`
+}
 
-interface WalletInfoProps {
+export interface WalletInfoProps {
   walletName: string
   walletAddress: string
-  /** True once the address has actually received a payment on-chain. */
+  /**
+   * True once the address has actually received a payment on-chain.
+   * Renders a verified badge next to the wallet name.
+   */
   active?: boolean
   loading?: boolean
 }
@@ -51,7 +63,7 @@ export function WalletInfo({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -12 }}
+      initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       className="bg-card space-y-4 rounded-2xl border p-5 shadow-sm"
     >
@@ -59,7 +71,7 @@ export function WalletInfo({
         <div className="bg-primary/10 flex size-12 shrink-0 items-center justify-center rounded-xl">
           <Wallet className="text-primary size-6" aria-hidden />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h2 className="truncate text-lg font-semibold">{walletName}</h2>
             {active && (
@@ -70,7 +82,7 @@ export function WalletInfo({
             )}
           </div>
           <div className="mt-1 flex items-center gap-1">
-            <span className="font-heading text-muted-foreground text-sm">
+            <span className="font-mono text-muted-foreground text-sm">
               {shortenAddress(walletAddress)}
             </span>
             <Button
@@ -89,9 +101,12 @@ export function WalletInfo({
         </div>
       </div>
 
-      {/* The original rendered this button with no href, so it did nothing. */}
       <Button asChild variant="outline" size="sm" className="w-full">
-        <a href={`${EXPLORER_BASE}/${walletAddress}`} target="_blank" rel="noopener noreferrer">
+        <a
+          href={`${explorerBase()}/${walletAddress}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           <ExternalLink className="size-4" aria-hidden />
           View on explorer
         </a>

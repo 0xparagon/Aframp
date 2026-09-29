@@ -36,10 +36,27 @@ This document describes all GitHub Actions workflows configured for the Aframp p
   baseline test suite, so a flat global threshold would either block every PR forever or,
   once softened, stop meaning anything; gating the diff is the realistic middle ground.
 
-#### Build
+#### Build (Testnet) — all branches
 
-- **Next.js Build** - Production build verification
-- **Artifact Upload** - Stores build for deployment
+- **Next.js Build** — production build with `NEXT_PUBLIC_STELLAR_NETWORK: TESTNET`
+- Runs on every push and PR (depends on Code Quality + Tests)
+
+#### Build (Mainnet) — PRs targeting `main` only
+
+- **Next.js Build** — production build with `NEXT_PUBLIC_STELLAR_NETWORK: MAINNET`
+- Also sets `NEXT_PUBLIC_CNGN_ISSUER` and `NEXT_PUBLIC_USDC_ISSUER` from repository secrets so that any env-var assertions or conditional imports that differ between networks are exercised at build time
+- Only runs when `github.base_ref == 'main'` — no extra latency for develop-branch work
+- Uses `NEXT_API_URL_MAINNET` (separate secret from the testnet URL)
+
+**Why two build jobs?**
+
+The TESTNET and MAINNET configurations differ in network name, Horizon URLs, and issuer
+addresses. A Next.js build can succeed with testnet stubs while silently failing when
+the corresponding mainnet values are injected — for example if a module asserts that an
+env var matches a known value, or if dead-code elimination removes a path that only
+matters in production. The `build-mainnet` job runs those same build-time checks against
+production-shaped env vars on every PR before it merges to `main`, catching
+environment-specific failures before they reach the release pipeline.
 
 **Duration:** ~10-15 minutes
 
@@ -128,12 +145,15 @@ the app actually hits them.
 Set in GitHub repository settings → Secrets and variables:
 
 ```
-CODECOV_TOKEN           # Codecov integration
-NEXT_API_URL     # API endpoint
-NEXT_PUBLIC_STELLAR_NETWORK  # Stellar network
-VERCEL_TOKEN            # Vercel deployment
-VERCEL_ORG_ID           # Vercel organization
-VERCEL_PROJECT_ID       # Vercel project
+CODECOV_TOKEN                # Codecov integration
+NEXT_API_URL                 # API endpoint (testnet / non-prod)
+NEXT_API_URL_MAINNET         # API endpoint for the mainnet build job
+NEXT_PUBLIC_STELLAR_NETWORK  # Set per-job in ci.yml (TESTNET or MAINNET)
+MAINNET_CNGN_ISSUER          # cNGN issuer address for the mainnet build
+MAINNET_USDC_ISSUER          # USDC issuer address for the mainnet build
+VERCEL_TOKEN                 # Vercel deployment
+VERCEL_ORG_ID                # Vercel organization
+VERCEL_PROJECT_ID            # Vercel project
 ```
 
 ### Concurrency Control
