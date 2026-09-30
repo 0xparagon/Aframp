@@ -9,6 +9,7 @@ import {
   type Me,
   type OtpChallengeResponse,
 } from '@/lib/api'
+import { getItem, removeItem, setItem } from '@/lib/storage'
 
 const STORAGE_KEY = 'aframp.session'
 
@@ -26,7 +27,12 @@ interface SessionContextValue {
    * no-phone accounts) vs a challenge (everyone else) that needs `/verify`. */
   signIn: (email: string, password: string) => Promise<LoginResult>
   /** Always a challenge — the account doesn't exist until `completeOtp` succeeds. */
-  signUp: (email: string, password: string, name: string, phoneNumber: string) => Promise<OtpChallengeResponse>
+  signUp: (
+    email: string,
+    password: string,
+    name: string,
+    phoneNumber: string
+  ) => Promise<OtpChallengeResponse>
   completeOtp: (challengeId: string, code: string) => Promise<void>
   signOut: () => void
   /** Re-fetches /me and updates any cached profile data. */
@@ -52,17 +58,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
-      const stored = window.localStorage.getItem(STORAGE_KEY)
+      const stored = getItem(STORAGE_KEY)
       if (stored) setSession(JSON.parse(stored) as Session)
     } catch {
-      window.localStorage.removeItem(STORAGE_KEY)
+      removeItem(STORAGE_KEY)
     }
     setReady(true)
   }, [])
 
   const persist = useCallback((next: Session) => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+      setItem(STORAGE_KEY, JSON.stringify(next))
     } catch {
       // Storage may be unavailable (private mode, quota, blocked) — the
       // session still works for this tab, it just won't survive a reload.
@@ -81,9 +87,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     [persist]
   )
 
-  const signUp = useCallback((email: string, password: string, name: string, phoneNumber: string) => {
-    return api.signup(email, password, name, phoneNumber)
-  }, [])
+  const signUp = useCallback(
+    (email: string, password: string, name: string, phoneNumber: string) => {
+      return api.signup(email, password, name, phoneNumber)
+    },
+    []
+  )
 
   const completeOtp = useCallback(
     async (challengeId: string, code: string) => {
@@ -96,7 +105,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     // Best-effort: a failed logout call shouldn't block clearing the local
     // session, but it's the only thing that clears the server-side cookie.
     if (session) api.logout(session.token).catch(() => {})
-    window.localStorage.removeItem(STORAGE_KEY)
+    removeItem(STORAGE_KEY)
     setSession(null)
     setMe(null)
   }, [session])
