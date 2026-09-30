@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { api, ApiError } from '@/lib/api'
 import WithdrawPage from '../page'
@@ -172,7 +172,7 @@ describe('WithdrawPage', () => {
     expect(await screen.findByText('Account numbers are 10 digits.')).toBeInTheDocument()
   })
 
-  it('submits a valid cash-out', async () => {
+  it('waits for confirmation before submitting a valid cash-out', async () => {
     const user = userEvent.setup()
     mockGetBalances.mockResolvedValue([balance('cNGN', 10_000_000_000n)])
     render(<WithdrawPage />)
@@ -183,6 +183,15 @@ describe('WithdrawPage', () => {
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '044' } })
     await user.type(screen.getByLabelText('Account number'), '0123456789')
     await user.click(screen.getByRole('button', { name: 'Cash out' }))
+
+    expect(mockCreateWithdrawal).not.toHaveBeenCalled()
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog).toBeInTheDocument()
+    expect(screen.getByText('50 cNGN')).toBeInTheDocument()
+    expect(within(dialog).getByText('Access Bank')).toBeInTheDocument()
+    expect(screen.getByText('••••••6789')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Confirm cash out' }))
 
     await waitFor(() =>
       expect(mockCreateWithdrawal).toHaveBeenCalledWith(

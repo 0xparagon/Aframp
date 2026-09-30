@@ -6,6 +6,16 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import {
   Select,
@@ -41,6 +51,13 @@ export default function WithdrawPage() {
   const [accountNumber, setAccountNumber] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [confirmation, setConfirmation] = useState<{
+    amount: bigint
+    asset: WithdrawalAsset
+    bankCode: string
+    bankName: string
+    accountNumber: string
+  } | null>(null)
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -103,7 +120,7 @@ export default function WithdrawPage() {
     return null
   }
 
-  async function submit(event: React.FormEvent) {
+  function submit(event: React.FormEvent) {
     event.preventDefault()
     const problem = validate()
     if (problem) {
@@ -111,10 +128,26 @@ export default function WithdrawPage() {
       return
     }
 
+    const bankName = getBankOptions(asset).find((bank) => bank.code === bankCode)?.name ?? bankCode
+    setError(null)
+    setConfirmation({ amount: stroops!, asset, bankCode, bankName, accountNumber })
+  }
+
+  async function confirmWithdrawal() {
+    if (!confirmation) return
+
+    const request = confirmation
+    setConfirmation(null)
     setSubmitting(true)
     setError(null)
     try {
-      await api.createWithdrawal(token, stroops!, bankCode, accountNumber, asset)
+      await api.createWithdrawal(
+        token,
+        request.amount,
+        request.bankCode,
+        request.accountNumber,
+        request.asset
+      )
       setAmount('')
       setBankCode('')
       setAccountNumber('')
@@ -238,6 +271,45 @@ export default function WithdrawPage() {
             {submitting ? 'Sending…' : 'Cash out'}
           </Button>
         </form>
+
+        <AlertDialog
+          open={confirmation !== null}
+          onOpenChange={(open) => {
+            if (!open) setConfirmation(null)
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm cash-out</AlertDialogTitle>
+              <AlertDialogDescription>
+                Review the details before sending your withdrawal.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {confirmation && (
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                <dt className="text-muted-foreground">Amount</dt>
+                <dd className="font-medium">
+                  {formatStroops(confirmation.amount)} {confirmation.asset}
+                </dd>
+                <dt className="text-muted-foreground">Asset</dt>
+                <dd>{confirmation.asset}</dd>
+                <dt className="text-muted-foreground">Bank</dt>
+                <dd>{confirmation.bankName}</dd>
+                <dt className="text-muted-foreground">Account</dt>
+                <dd>••••••{confirmation.accountNumber.slice(-4)}</dd>
+              </dl>
+            )}
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={submitting}
+                onClick={() => void confirmWithdrawal()}
+              >
+                {submitting ? 'Sending…' : 'Confirm cash out'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {withdrawals.length > 0 && (
           <section className="space-y-3">
