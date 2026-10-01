@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { SendPageClient, buildAssets } from '../send-page-client'
 import { type Balance } from '@/lib/api'
@@ -35,6 +35,7 @@ describe('SendPageClient', () => {
       push: mockPush,
       back: mockBack,
     })
+    localStorage.clear()
   })
 
   const goToAmountStep = () => {
@@ -125,6 +126,42 @@ describe('SendPageClient', () => {
 
     // 5000000000 stroops = 500 USDC
     expect(screen.getByText(/Balance: 500 USDC/)).toBeInTheDocument()
+  })
+
+  it('adds a contact to localStorage after a successful send', async () => {
+    jest.useFakeTimers()
+
+    render(<SendPageClient balances={mockBalances} />)
+
+    fireEvent.change(screen.getByPlaceholderText('G... or @username'), {
+      target: {
+        value: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+      },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }))
+
+    fireEvent.click(screen.getByRole('button', { name: '1' }))
+    fireEvent.click(screen.getByRole('button', { name: '0' }))
+    fireEvent.click(screen.getByRole('button', { name: '0' }))
+
+    fireEvent.click(screen.getByRole('button', { name: /review/i }))
+    fireEvent.click(screen.getByRole('button', { name: /confirm send/i }))
+
+    act(() => {
+      jest.advanceTimersByTime(2200)
+    })
+
+    const stored = localStorage.getItem('aframp_contacts')
+    expect(stored).not.toBeNull()
+    const contacts = JSON.parse(stored!) as Array<{ address: string; name: string }>
+    expect(contacts.length).toBeGreaterThanOrEqual(1)
+    expect(
+      contacts.some(
+        (c) => c.address === 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+      )
+    ).toBe(true)
+
+    jest.useRealTimers()
   })
 })
 
