@@ -6,7 +6,7 @@ import { ArrowLeft, Copy, Check, Camera, AlertCircle } from 'lucide-react'
 import QRCode from 'react-qr-code'
 import { Button } from '@/components/ui/button'
 import { QRScanner } from '@/components/send/qr-scanner'
-import { CountdownTimer } from '@/components/countdown-timer'
+import { CountdownTimer } from '@/components/ui/countdown-timer'
 import { cn } from '@/lib/utils'
 import { useMediaQuery } from '@/hooks/use-media-query'
 
