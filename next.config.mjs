@@ -26,6 +26,7 @@ const nextConfig = {
   // forwards those requests server-side to the real backend. NEXT_API_URL
   // (deliberately not NEXT_PUBLIC_*) never reaches client-side code — it
   // can't leak via devtools, a bundle diff, or CSP `connect-src`.
+  // See docs/adr-001-backend-proxy.md for the rationale and consequences.
   rewrites() {
     const backendUrl = (process.env.NEXT_API_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '')
     return [

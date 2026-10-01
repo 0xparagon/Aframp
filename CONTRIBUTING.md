@@ -248,6 +248,10 @@ components/
 
 ## Testing
 
+### Backend BigInt Fields
+
+Every backend wire field carrying a large integer must be added to `BIGINT_KEYS` in [lib/api.ts](lib/api.ts) and to the field-name alternatives in `parseWithBigInts`' pre-parse regex. Both are required to avoid precision loss in `JSON.parse`. Add or update coverage in [lib/__tests__/api.test.ts](lib/__tests__/api.test.ts).
+
 ### Writing Tests
 
 ```typescript
