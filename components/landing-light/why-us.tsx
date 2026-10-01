@@ -12,6 +12,8 @@ export function WhyUs() {
           aria-hidden="true"
           width={535}
           height={570}
+          sizes="(max-width: 1024px) 100vw, 320px"
+          decoding="async"
           className="h-auto w-full max-w-[320px]"
         />
       </div>

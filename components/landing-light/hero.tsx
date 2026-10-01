@@ -36,6 +36,8 @@ export function Hero() {
           width={705}
           height={835}
           priority
+          sizes="(max-width: 1024px) 100vw, 460px"
+          decoding="async"
           className="hidden h-auto w-full max-w-[460px] justify-self-end lg:block"
         />
       </div>
