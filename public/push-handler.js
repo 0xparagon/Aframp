@@ -1,11 +1,10 @@
 /**
  * Aframp Push Notification Handler
  *
- * This script is imported by the main service worker (sw.js) to handle
+ * This script is imported by the push-only service worker (sw.js) to handle
  * incoming Web Push messages and notification click events.
  *
- * The main sw.js calls: importScripts('/push-handler.js')
- * (See next.config.mjs for the sw customisation or self.importScripts call)
+ * sw.js calls: importScripts('/push-handler.js')
  */
 
 /* global self, clients */
@@ -28,7 +27,7 @@ self.addEventListener('push', (event) => {
   const {
     title = 'Aframp',
     body = '',
-    icon = '/icons/icon-192x192.png',
+    icon = '/icon-192x192.png',
     badge = '/icons/badge-72x72.png',
     tag = 'aframp-push',
     url = '/',
