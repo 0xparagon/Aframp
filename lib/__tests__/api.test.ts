@@ -45,8 +45,20 @@ describe('parseWithBigInts', () => {
       amount_stroops: bigint
       available: bigint
       pending: bigint
-    }>('{"amount_stroops":1,"available":2,"pending":3}')
-    expect(parsed).toEqual({ amount_stroops: 1n, available: 2n, pending: 3n })
+      fee_stroops: bigint
+      network_fee_stroops: bigint
+      total_stroops: bigint
+    }>(
+      '{"amount_stroops":1,"available":2,"pending":3,"fee_stroops":9007199254740993,"network_fee_stroops":5,"total_stroops":6}'
+    )
+    expect(parsed).toEqual({
+      amount_stroops: 1n,
+      available: 2n,
+      pending: 3n,
+      fee_stroops: 9007199254740993n,
+      network_fee_stroops: 5n,
+      total_stroops: 6n,
+    })
   })
 
   it('leaves non-bigint keys and string values untouched', () => {

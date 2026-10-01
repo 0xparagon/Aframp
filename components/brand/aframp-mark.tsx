@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 export function AframpMark({ className }: { className?: string }) {
   return (
     <Image
-      src="/logo-mark.png"
+      src="/logo-mark.webp"
       alt="Aframp"
       width={100}
       height={107}

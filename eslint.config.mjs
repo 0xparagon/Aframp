@@ -10,8 +10,8 @@ import tseslint from 'typescript-eslint'
 // that patch entirely.
 const config = [
   {
-    // public/sw.js and workbox-*.js are generated PWA build output, not
-    // hand-written source — coverage/ is the Jest coverage report.
+    // Public assets are runtime files, not hand-written source;
+    // coverage/ is the Jest coverage report.
     ignores: [
       '.next/**',
       'node_modules/**',

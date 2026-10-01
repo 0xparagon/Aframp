@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, QrCode, ChevronRight, Wallet, StickyNote } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -10,7 +10,7 @@ import { RecentRecipients } from './recent-recipients'
 import { QRScanner } from './qr-scanner'
 import { TransactionConfirmation } from './transaction-confirmation'
 
-type Step = 'recipient' | 'amount' | 'confirm' | 'success'
+type Step = 'recipient' | 'amount' | 'confirm' | 'success' | 'failure'
 
 export interface CryptoAsset {
   symbol: string
@@ -46,6 +46,8 @@ export function SendPageClient() {
   const [step, setStep] = useState<Step>('recipient')
   const [scannerOpen, setScannerOpen] = useState(false)
   const [isSending, setIsSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [failureReason, setFailureReason] = useState<string | null>(null)
   const [recipientInput, setRecipientInput] = useState('')
   const [form, setForm] = useState<SendFormState>({
     recipient: null,
@@ -103,11 +105,59 @@ export function SendPageClient() {
     setForm((prev) => ({ ...prev, amount: prev.amount + key }))
   }
 
+  useEffect(() => {
+    if (step !== 'amount') return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const { key } = event
+
+      if (key >= '0' && key <= '9') {
+        event.preventDefault()
+        handleNumpad(key)
+        return
+      }
+
+      if (key === 'Backspace') {
+        event.preventDefault()
+        handleNumpad('⌫')
+        return
+      }
+
+      if (key === '.') {
+        event.preventDefault()
+        handleNumpad('.')
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [step, form.amount])
+
   const handleSend = async () => {
     setIsSending(true)
-    await new Promise((resolve) => setTimeout(resolve, 2200))
-    setIsSending(false)
-    setStep('success')
+    setError(null)
+    setFailureReason(null)
+    try {
+      // Simulate API call with a chance of failure for testing
+      await new Promise((resolve) => setTimeout(resolve, 2200))
+      // In production, this would be: await api.createRemittance(...)
+      setIsSending(false)
+      setStep('success')
+    } catch (cause) {
+      setIsSending(false)
+      const errorMsg = cause instanceof Error ? cause.message : 'Send failed'
+      // Extract failure_reason if available from API response
+      const failureReasonMsg = cause instanceof Error && 'failureReason' in cause 
+        ? (cause as any).failureReason 
+        : undefined
+      setError(errorMsg)
+      setFailureReason(failureReasonMsg || null)
+      setStep('failure')
+    }
+  }
+
+  const handleRetry = async () => {
+    await handleSend()
   }
 
   const isRecipientValid = recipientInput.trim().length > 5
@@ -281,20 +331,30 @@ export function SendPageClient() {
 
             {/* Numpad */}
             <div className="grid grid-cols-3 gap-1.5 mt-auto">
-              {NUMPAD_KEYS.flat().map((key) => (
-                <button
-                  key={key}
-                  onClick={() => handleNumpad(key)}
-                  className={cn(
-                    'h-14 rounded-xl font-semibold text-lg transition-all duration-100 active:scale-95',
-                    key === '⌫'
-                      ? 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
-                      : 'bg-muted/50 hover:bg-muted/80 active:bg-muted'
-                  )}
-                >
-                  {key}
-                </button>
-              ))}
+              {NUMPAD_KEYS.flat().map((key) => {
+                const buttonLabel =
+                  key === '⌫'
+                    ? 'Delete amount'
+                    : key === '.'
+                      ? 'Add decimal point'
+                      : `Enter amount ${key}`
+
+                return (
+                  <button
+                    key={key}
+                    aria-label={buttonLabel}
+                    onClick={() => handleNumpad(key)}
+                    className={cn(
+                      'h-14 rounded-xl font-semibold text-lg transition-all duration-100 active:scale-95',
+                      key === '⌫'
+                        ? 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                        : 'bg-muted/50 hover:bg-muted/80 active:bg-muted'
+                    )}
+                  >
+                    {key}
+                  </button>
+                )
+              })}
             </div>
 
             {/* CTA */}
@@ -309,15 +369,18 @@ export function SendPageClient() {
           </div>
         )}
 
-        {/* ── Confirm & Success Steps ── */}
-        {(step === 'confirm' || step === 'success') && (
+        {/* ── Confirm, Success & Failure Steps ── */}
+        {(step === 'confirm' || step === 'success' || step === 'failure') && (
           <TransactionConfirmation
             form={form}
             step={step}
             isSending={isSending}
-            onBack={() => setStep('amount')}
+            error={error}
+            failureReason={failureReason}
+            onBack={() => step === 'failure' ? setStep('confirm') : setStep('amount')}
             onConfirm={handleSend}
             onDone={() => router.push('/dashboard')}
+            onRetry={handleRetry}
           />
         )}
       </div>
