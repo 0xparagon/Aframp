@@ -1,14 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  ArrowLeft,
-  Copy,
-  Check,
-  Camera,
-  AlertCircle,
-} from 'lucide-react'
+import { ArrowLeft, Copy, Check, Camera, AlertCircle } from 'lucide-react'
 import QRCode from 'react-qr-code'
 import { Button } from '@/components/ui/button'
 import { QRScanner } from '@/components/send/qr-scanner'
@@ -47,17 +41,9 @@ export function RequestPageClient({ requestId, request = MOCK_REQUEST }: Request
   const router = useRouter()
   const [scannerOpen, setScannerOpen] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
+  const isMobile = useMediaQuery('(max-width: 767px)')
   const [scannedAddress, setScannedAddress] = useState<string | null>(null)
   const [isExpired, setIsExpired] = useState(new Date(request.expires_at).getTime() <= Date.now())
-
-  // Detect mobile viewport
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
-  }, [])
 
   const handleCopyWallet = async () => {
     if (isExpired) return
@@ -226,10 +212,7 @@ export function RequestPageClient({ requestId, request = MOCK_REQUEST }: Request
 
       {/* ── QR Scanner Modal ── */}
       {scannerOpen && (
-        <QRScanner
-          onScan={handleScanPayment}
-          onClose={() => setScannerOpen(false)}
-        />
+        <QRScanner onScan={handleScanPayment} onClose={() => setScannerOpen(false)} />
       )}
     </div>
   )

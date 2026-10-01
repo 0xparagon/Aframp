@@ -16,7 +16,7 @@
   --secondary: oklch(0.95 0.01 90);
   --secondary-foreground: oklch(0.15 0.01 60);
   --muted: oklch(0.94 0.01 90);
-  --muted-foreground: oklch(0.38 0.01 60);
+  --muted-foreground: oklch(0.44 0.01 60);
   --accent: oklch(0.75 0.15 85);
   --accent-foreground: oklch(0.15 0.01 60);
   --destructive: oklch(0.577 0.245 27.325);
@@ -338,7 +338,7 @@
   --color-hairline: #1f1e1d;
   --color-nav-active: #232425;
 
-  --color-dim: #8e9094;
+  --color-dim: #a6a8ac;
   --color-bright: #c9cbcf;
 
   --font-brand: var(--font-atkinson), ui-sans-serif, system-ui, -apple-system, sans-serif;
@@ -346,42 +346,6 @@
 
 /* Landing page surfaces, sampled from designs/Aframp landing Page.png.
    Same brand green as the dashboard (#33cc33) — only the section and
-   card grounds differ, so they get their own names. */
-@theme {
-  --color-band: #0f0b09;
-  --color-surface: #110c09;
-  --color-edge: #2d2824;
-}
+   card grou
 
-/* Partner logo marquee on the home page. Halts for reduced-motion users. */
-@keyframes marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    /* The lane renders the list twice, so half a lane is one full loop. */
-    transform: translateX(-50%);
-  }
-}
-
-.animate-marquee {
-  animation: marquee 32s linear infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .animate-marquee {
-    animation: none;
-  }
-}
-
-/* Light landing page, sampled from designs/1920w light(1).png.
-   Brand green matches the other designs (#33cc33); the rest of this
-   palette is specific to the light direction. */
-@theme {
-  --color-mint: #ebffeb;
-  --color-lavender: #f5f4fc;
-  --color-charcoal: #1e1e1e;
-  --color-accent-purple: #7146eb;
-  --color-accent-pink: #ee7fc4;
-  --color-accent-teal: #18bac0;
-}
+/* … truncated 928 chars — edit only what you need near the top … */
