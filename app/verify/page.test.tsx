@@ -48,8 +48,10 @@ describe('VerifyOtpPage', () => {
     expect(screen.getByRole('button', { name: /verify/i })).toBeInTheDocument()
   })
 
-  it('submits the code against the challenge and redirects to /charge on success', async () => {
-    ;(useSearchParams as jest.Mock).mockReturnValue(paramsWith({ challenge_id: 'chal-1', flow: 'login' }))
+  it('submits the code against the challenge and redirects to /home on login success', async () => {
+    ;(useSearchParams as jest.Mock).mockReturnValue(
+      paramsWith({ challenge_id: 'chal-1', flow: 'login' })
+    )
     completeOtp.mockResolvedValue(undefined)
     const user = userEvent.setup()
     render(<VerifyOtpPage />)
@@ -58,7 +60,7 @@ describe('VerifyOtpPage', () => {
     await user.click(screen.getByRole('button', { name: /verify/i }))
 
     expect(completeOtp).toHaveBeenCalledWith('chal-1', '482913')
-    expect(replace).toHaveBeenCalledWith('/charge')
+    expect(replace).toHaveBeenCalledWith('/home')
   })
 
   it('lets the user retry on an incorrect code without losing the challenge', async () => {

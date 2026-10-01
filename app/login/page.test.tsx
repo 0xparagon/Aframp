@@ -49,7 +49,7 @@ describe('LoginPage', () => {
     expect(signIn).not.toHaveBeenCalled()
   })
 
-  it('shows the offline alert variant when ApiError has status 0', async () => {
+  it('goes straight to /home for a legacy account that gets a session directly', async () => {
     const user = userEvent.setup()
     signIn.mockRejectedValueOnce(Object.assign(new Error('You are offline'), { status: 0 }))
     render(<LoginPage />)
@@ -87,7 +87,8 @@ describe('LoginPage', () => {
     await user.type(screen.getByLabelText('Password'), 'secret')
     await user.click(screen.getByRole('button', { name: 'Sign in' }))
 
-    await waitFor(() => expect(replace).toHaveBeenCalledWith('/charge'))
+    expect(signIn).toHaveBeenCalledWith('merchant@example.com', 'secret-pass')
+    expect(replace).toHaveBeenCalledWith('/home')
     expect(push).not.toHaveBeenCalled()
   })
 
@@ -108,8 +109,8 @@ describe('LoginPage', () => {
     const button = screen.getByRole('button', { name: 'Signing in…' })
     expect(button).toBeDisabled()
 
-    resolveSignIn({ access_token: 'token', merchant_id: 'merchant-1' })
-    await waitFor(() => expect(replace).toHaveBeenCalledWith('/charge'))
+    expect(push).toHaveBeenCalledWith('/verify?challenge_id=chal-123&flow=login')
+    expect(replace).not.toHaveBeenCalledWith('/home')
   })
 
   it('redirects to /login when a 401 response is returned during sign-in', async () => {
