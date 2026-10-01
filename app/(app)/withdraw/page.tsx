@@ -86,8 +86,9 @@ export default function WithdrawPage() {
   // If the selected asset no longer has a balance (e.g. after a cash-out), fall
   // back to the first asset the merchant can still cash out.
   useEffect(() => {
-    if (withdrawableAssets.length === 0 || withdrawableAssets.includes(asset)) return
-    selectAsset(withdrawableAssets[0])
+    if (withdrawableAssets.length > 0 && !withdrawableAssets.includes(asset)) {
+      selectAsset(withdrawableAssets[0])
+    }
   }, [withdrawableAssets, asset, selectAsset])
 
   function validate(): string | null {

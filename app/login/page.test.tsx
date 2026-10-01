@@ -111,4 +111,17 @@ describe('LoginPage', () => {
     resolveSignIn({ access_token: 'token', merchant_id: 'merchant-1' })
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/charge'))
   })
+
+  it('redirects to /login when a 401 response is returned during sign-in', async () => {
+    const user = userEvent.setup()
+    const unauthorized = Object.assign(new Error('Unauthorized'), { status: 401 })
+    signIn.mockRejectedValue(unauthorized)
+    render(<LoginPage />)
+
+    await user.type(screen.getByLabelText(/email/i), 'merchant@example.com')
+    await user.type(screen.getByLabelText(/password/i), 'secret-pass')
+    await user.click(screen.getByRole('button', { name: /sign in/i }))
+
+    expect(replace).toHaveBeenCalledWith('/login')
+  })
 })
