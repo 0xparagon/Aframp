@@ -446,7 +446,7 @@ export const api = {
   createWallet: (token: string) =>
     request<Wallet>('/wallet/create', { method: 'POST', body: {}, token }),
 
-  getWallet: (token: string) => request<Wallet>('/wallet', { token }),
+  getWallet: (token: string, signal?: AbortSignal) => request<Wallet>('/wallet', { token, signal }),
 
   getBalances: (token: string, signal?: AbortSignal) =>
     request<Balance[]>('/balance', { token, signal }),
