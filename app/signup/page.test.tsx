@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import { axe } from 'jest-axe'
 import userEvent from '@testing-library/user-event'
 import SignupPage from './page'
 import { useSession } from '@/components/session-provider'
@@ -32,12 +33,13 @@ describe('SignupPage', () => {
     })
   })
 
-  it('renders the sign-up form', () => {
-    render(<SignupPage />)
+  it('renders an accessible sign-up form', async () => {
+    const { container } = render(<SignupPage />)
 
     expect(screen.getByRole('heading', { name: /create your account/i })).toBeInTheDocument()
     expect(screen.getByLabelText(/phone number/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /create account/i })).toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
   })
 
   it('shows validation errors when required fields are empty', async () => {

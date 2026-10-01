@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import { axe } from 'jest-axe'
 import userEvent from '@testing-library/user-event'
 import LoginPage, { CHALLENGE_SESSION_KEY } from './page'
 import { useSession } from '@/components/session-provider'
@@ -32,11 +33,12 @@ describe('LoginPage', () => {
     })
   })
 
-  it('renders the sign-in form', () => {
-    render(<LoginPage />)
+  it('renders an accessible sign-in form', async () => {
+    const { container } = render(<LoginPage />)
 
     expect(screen.getByRole('heading', { name: /aframp pay/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
   })
 
   it('shows a validation message when required fields are empty', async () => {
