@@ -62,9 +62,17 @@ export default function WalletPage() {
 
   async function copyAddress() {
     if (!wallet) return
-    await navigator.clipboard.writeText(wallet.address)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    try {
+      await navigator.clipboard.writeText(wallet.address)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (clipboardError) {
+      // Clipboard API can fail in non-secure contexts or when permissions are denied
+      setError(
+        'Could not copy — please select and copy the address manually using your browser.'
+      )
+      console.error('Clipboard copy failed:', clipboardError)
+    }
   }
 
   if (loading) {

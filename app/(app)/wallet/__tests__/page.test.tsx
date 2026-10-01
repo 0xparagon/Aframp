@@ -1,0 +1,273 @@
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import WalletPage from '../page'
+import { api } from '@/lib/api'
+
+// Mock dependencies
+jest.mock('@/components/session-provider', () => ({
+  useAuthenticatedSession: () => ({ token: 'test-token', userId: 'user-1', merchantId: 'merchant-1' }),
+  useSession: () => ({
+    me: {
+      user_id: 'user-1',
+      email: 'test@example.com',
+      name: 'Test User',
+      merchant_name: 'Test Merchant',
+      is_admin: false,
+      created_at: '2024-01-01T00:00:00Z',
+      merchant_id: 'merchant-1',
+    },
+  }),
+}))
+
+jest.mock('@/lib/api', () => ({
+  api: {
+    getWallet: jest.fn(),
+    getBalances: jest.fn(),
+    createWallet: jest.fn(),
+  },
+  ApiError: class ApiError extends Error {
+    constructor(message: string, public status: number) {
+      super(message)
+    }
+  },
+}))
+
+// Mock clipboard API
+Object.assign(navigator, {
+  clipboard: {
+    writeText: jest.fn(),
+  },
+})
+
+describe('WalletPage', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    ;(navigator.clipboard.writeText as jest.Mock).mockResolvedValue(undefined)
+  })
+
+  const mockWallet = {
+    id: 'wallet-1',
+    merchant_id: 'merchant-1',
+    address: 'GTEST123EXAMPLEADDRESS456',
+    network: 'stellar',
+    created_at: '2024-01-01T00:00:00Z',
+  }
+
+  const mockBalances = [
+    {
+      merchant_id: 'merchant-1',
+      asset: 'XLM',
+      available: 1000000000n,
+      pending: 500000000n,
+      updated_at: '2024-01-01T00:00:00Z',
+    },
+    {
+      merchant_id: 'merchant-1',
+      asset: 'cNGN',
+      available: 5000000000n,
+      pending: 0n,
+      updated_at: '2024-01-01T00:00:00Z',
+    },
+  ]
+
+  describe('Loading state', () => {
+    it('shows loading spinner initially', async () => {
+      ;(api.getWallet as jest.Mock).mockImplementation(() => new Promise(() => {}))
+      ;(api.getBalances as jest.Mock).mockImplementation(() => new Promise(() => {}))
+
+      render(<WalletPage />)
+
+      expect(screen.getByRole('status')).toBeInTheDocument()
+    })
+  })
+
+  describe('Wallet exists', () => {
+    it('displays wallet address and balances', async () => {
+      ;(api.getWallet as jest.Mock).mockResolvedValue(mockWallet)
+      ;(api.getBalances as jest.Mock).mockResolvedValue(mockBalances)
+
+      render(<WalletPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Merchant')).toBeInTheDocument()
+        expect(screen.getByText('test@example.com')).toBeInTheDocument()
+        expect(screen.getByText(mockWallet.address)).toBeInTheDocument()
+      })
+
+      expect(screen.getByText(/balances/i)).toBeInTheDocument()
+    })
+
+    it('copies address to clipboard successfully', async () => {
+      const user = userEvent.setup()
+      ;(api.getWallet as jest.Mock).mockResolvedValue(mockWallet)
+      ;(api.getBalances as jest.Mock).mockResolvedValue(mockBalances)
+
+      render(<WalletPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText(mockWallet.address)).toBeInTheDocument()
+      })
+
+      const copyButton = screen.getByRole('button', { name: /copy address/i })
+      await user.click(copyButton)
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(mockWallet.address)
+
+      await waitFor(() => {
+        expect(screen.getByText(/copied/i)).toBeInTheDocument()
+      })
+    })
+
+    it('shows error when clipboard write fails', async () => {
+      const user = userEvent.setup()
+      ;(navigator.clipboard.writeText as jest.Mock).mockRejectedValue(
+        new Error('Clipboard permission denied')
+      )
+      ;(api.getWallet as jest.Mock).mockResolvedValue(mockWallet)
+      ;(api.getBalances as jest.Mock).mockResolvedValue(mockBalances)
+
+      render(<WalletPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText(mockWallet.address)).toBeInTheDocument()
+      })
+
+      const copyButton = screen.getByRole('button', { name: /copy address/i })
+      await user.click(copyButton)
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/could not copy — please select and copy the address manually/i)
+        ).toBeInTheDocument()
+      })
+    })
+
+    it('resets copied state after 2 seconds', async () => {
+      jest.useFakeTimers()
+      const user = userEvent.setup({ delay: null })
+      ;(api.getWallet as jest.Mock).mockResolvedValue(mockWallet)
+      ;(api.getBalances as jest.Mock).mockResolvedValue(mockBalances)
+
+      render(<WalletPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText(mockWallet.address)).toBeInTheDocument()
+      })
+
+      const copyButton = screen.getByRole('button', { name: /copy address/i })
+      await user.click(copyButton)
+
+      await waitFor(() => {
+        expect(screen.getByText(/copied/i)).toBeInTheDocument()
+      })
+
+      jest.advanceTimersByTime(2000)
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /copy address/i })).toBeInTheDocument()
+        expect(screen.queryByText(/copied/i)).not.toBeInTheDocument()
+      })
+
+      jest.useRealTimers()
+    })
+  })
+
+  describe('No wallet yet', () => {
+    it('shows create wallet prompt when wallet does not exist', async () => {
+      const ApiError = (api as any).ApiError
+      ;(api.getWallet as jest.Mock).mockRejectedValue(new ApiError('No wallet found', 400))
+      ;(api.getBalances as jest.Mock).mockResolvedValue([])
+
+      render(<WalletPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText(/set up your payment address/i)).toBeInTheDocument()
+      })
+
+      expect(screen.getByRole('button', { name: /create payment address/i })).toBeInTheDocument()
+    })
+
+    it('creates wallet when button is clicked', async () => {
+      const user = userEvent.setup()
+      const ApiError = (api as any).ApiError
+      ;(api.getWallet as jest.Mock).mockRejectedValueOnce(new ApiError('No wallet found', 400))
+      ;(api.createWallet as jest.Mock).mockResolvedValue(mockWallet)
+      ;(api.getBalances as jest.Mock).mockResolvedValue([])
+
+      render(<WalletPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText(/set up your payment address/i)).toBeInTheDocument()
+      })
+
+      const createButton = screen.getByRole('button', { name: /create payment address/i })
+      await user.click(createButton)
+
+      expect(api.createWallet).toHaveBeenCalledWith('test-token')
+
+      await waitFor(() => {
+        expect(screen.getByText(mockWallet.address)).toBeInTheDocument()
+      })
+    })
+
+    it('shows error when wallet creation fails', async () => {
+      const user = userEvent.setup()
+      const ApiError = (api as any).ApiError
+      ;(api.getWallet as jest.Mock).mockRejectedValue(new ApiError('No wallet found', 400))
+      ;(api.createWallet as jest.Mock).mockRejectedValue(new Error('Creation failed'))
+      ;(api.getBalances as jest.Mock).mockResolvedValue([])
+
+      render(<WalletPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText(/set up your payment address/i)).toBeInTheDocument()
+      })
+
+      const createButton = screen.getByRole('button', { name: /create payment address/i })
+      await user.click(createButton)
+
+      await waitFor(() => {
+        expect(screen.getByText(/creation failed/i)).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('Error handling', () => {
+    it('shows backend-down error for status 0', async () => {
+      const ApiError = (api as any).ApiError
+      ;(api.getWallet as jest.Mock).mockRejectedValue(new ApiError('Connection failed', 0))
+      ;(api.getBalances as jest.Mock).mockResolvedValue([])
+
+      render(<WalletPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText(/can't connect to the payment server/i)).toBeInTheDocument()
+      })
+    })
+
+    it('shows generic error for other failures', async () => {
+      ;(api.getWallet as jest.Mock).mockRejectedValue(new Error('Unexpected error'))
+      ;(api.getBalances as jest.Mock).mockResolvedValue([])
+
+      render(<WalletPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText(/unexpected error/i)).toBeInTheDocument()
+      })
+    })
+
+    it('continues to show wallet even if balances fail to load', async () => {
+      ;(api.getWallet as jest.Mock).mockResolvedValue(mockWallet)
+      ;(api.getBalances as jest.Mock).mockRejectedValue(new Error('Balance fetch failed'))
+
+      render(<WalletPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText(mockWallet.address)).toBeInTheDocument()
+      })
+
+      // Balance section should not appear
+      expect(screen.queryByText(/balances/i)).not.toBeInTheDocument()
+    })
+  })
+})
