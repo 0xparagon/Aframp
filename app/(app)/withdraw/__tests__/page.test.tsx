@@ -95,6 +95,25 @@ describe('WithdrawPage', () => {
     expect(await screen.findByText(/no balance to cash out/i)).toBeInTheDocument()
   })
 
+  it('keeps the selected asset configured when withdrawable balances become empty', async () => {
+    const user = userEvent.setup()
+    mockGetBalances
+      .mockResolvedValueOnce([balance('cNGN', 10_000_000_000n)])
+      .mockResolvedValueOnce([])
+
+    render(<WithdrawPage />)
+    await screen.findByRole('heading', { name: 'Cash out' })
+
+    await user.type(screen.getByLabelText('Amount (cNGN)'), '50')
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '044' } })
+    await user.type(screen.getByLabelText('Account number'), '0123456789')
+    await user.click(screen.getByRole('button', { name: 'Cash out' }))
+
+    expect(await screen.findByText(/no balance to cash out/i)).toBeInTheDocument()
+    expect(screen.getByLabelText('Amount (cNGN)')).toBeDisabled()
+    expect(screen.getByText('0 cNGN available')).toBeInTheDocument()
+  })
+
   it('shows the load error when the backend fails', async () => {
     mockGetBalances.mockRejectedValue(new ApiError('boom', 500))
     render(<WithdrawPage />)
