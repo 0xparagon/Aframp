@@ -59,3 +59,21 @@ const polyfills = {
 
 Object.defineProperties(global, polyfills)
 Object.defineProperties(globalThis, polyfills)
+
+// jsdom has no matchMedia; hooks/use-media-query.ts needs it. Default to "no match".
+if (typeof window !== 'undefined' && !window.matchMedia) {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    configurable: true,
+    value: (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }),
+  })
+}
