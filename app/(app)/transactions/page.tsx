@@ -5,23 +5,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { ErrorState } from '@/components/ui/error-state'
 import { EmptyStateIllustration } from '@/components/ui/empty-state-illustration'
-import {
-  api,
-  ApiError,
-  type Balance,
-  type Payment,
-  type PaymentStatus,
-  type Refund,
-} from '@/lib/api'
-import { formatStroops } from '@/lib/money'
-import {
-  filterPaymentsByDateRange,
-  filterPaymentsByStatus,
-  searchPayments,
-} from '@/lib/transaction-filters'
+import { api, ApiError, type Balance, type Payment, type PaymentStatus, type Refund } from '@/lib/api'
+import { formatStroops, parseAmountToStroops } from '@/lib/money'
 import { useAuthenticatedSession } from '@/components/session-provider'
 
 /** Testnet today; swap for `public` when the backend points at mainnet Horizon. */
@@ -77,10 +67,13 @@ export default function TransactionsPage() {
   const [refunds, setRefunds] = useState<Refund[]>([])
   const [refundingId, setRefundingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<PaymentStatus | 'all'>('all')
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
+  const [refundNotice, setRefundNotice] = useState<string | null>(null)
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false)
+  const [refundTarget, setRefundTarget] = useState<Payment | null>(null)
+  const [refundAmount, setRefundAmount] = useState('')
+  const [refundRecipient, setRefundRecipient] = useState('')
+  const [refundReason, setRefundReason] = useState('')
+  const [refundFormError, setRefundFormError] = useState<string | null>(null)
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -106,30 +99,72 @@ export default function TransactionsPage() {
     [token]
   )
 
-  const handleRefund = useCallback(
-    async (payment: Payment) => {
-      const confirmed = window.confirm(
-        `Refund ${formatStroops(payment.amount_stroops)} ${payment.asset} to ${payment.wallet_address}?`
-      )
-      if (!confirmed) return
+  const openRefundDialog = useCallback((payment: Payment) => {
+    setRefundTarget(payment)
+    setRefundAmount('')
+    setRefundRecipient(payment.wallet_address)
+    setRefundReason('')
+    setRefundFormError(null)
+    setRefundDialogOpen(true)
+  }, [])
 
-      setRefundingId(payment.id)
+  const handleRefund = useCallback(
+    async (event: React.FormEvent) => {
+      event.preventDefault()
+      if (!refundTarget) return
+
+      const cleanedAmount = refundAmount.trim()
+      const cleanedRecipient = refundRecipient.trim()
+      const cleanedReason = refundReason.trim()
+      const amountStroops = parseAmountToStroops(cleanedAmount)
+
+      if (!cleanedAmount || !amountStroops) {
+        setRefundFormError('Enter a valid refund amount.')
+        return
+      }
+
+      if (amountStroops <= 0n) {
+        setRefundFormError('Refund amount must be greater than zero.')
+        return
+      }
+
+      if (amountStroops > refundTarget.amount_stroops) {
+        setRefundFormError('Refund amount cannot exceed the original payment amount.')
+        return
+      }
+
+      if (!cleanedRecipient) {
+        setRefundFormError('Recipient address is required.')
+        return
+      }
+
+      setRefundingId(refundTarget.id)
+      setRefundFormError(null)
       try {
         const refund = await api.createRefund(
           token,
-          payment.id,
-          payment.amount_stroops,
-          payment.wallet_address,
-          'merchant refund'
+          refundTarget.id,
+          amountStroops,
+          cleanedRecipient,
+          cleanedReason || undefined
         )
+        setRefundNotice(`Refund requested successfully for ${formatStroops(refund.amount_stroops)} ${refund.asset}.`)
+        setRefundDialogOpen(false)
+        setRefundTarget(null)
+        setRefundAmount('')
+        setRefundRecipient('')
+        setRefundReason('')
         setRefunds((current) => [refund, ...current])
+        await load()
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : 'Could not create the refund request')
+        setRefundFormError(
+          cause instanceof Error ? cause.message : 'Could not create the refund request'
+        )
       } finally {
         setRefundingId(null)
       }
     },
-    [token]
+    [load, refundAmount, refundRecipient, refundReason, refundTarget, token]
   )
 
   useEffect(() => {
@@ -168,6 +203,11 @@ export default function TransactionsPage() {
     <div>
       <header className="space-y-3">
         <h1 className="text-2xl font-bold tracking-tight">Payments</h1>
+        {refundNotice && (
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+            {refundNotice}
+          </div>
+        )}
         {balances.length > 0 && (
           <ul aria-live="polite" aria-atomic="true" className="grid gap-2 sm:grid-cols-2">
             {balances.map((balance) => (
@@ -218,7 +258,7 @@ export default function TransactionsPage() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => void handleRefund(payment)}
+                    onClick={() => openRefundDialog(payment)}
                     disabled={refundingId === payment.id}
                   >
                     {refundingId === payment.id ? 'Refunding…' : 'Refund'}
@@ -237,6 +277,71 @@ export default function TransactionsPage() {
           ))}
         </ul>
       )}
+
+      <Dialog open={refundDialogOpen} onOpenChange={(open) => {
+        setRefundDialogOpen(open)
+        if (!open) {
+          setRefundTarget(null)
+          setRefundAmount('')
+          setRefundRecipient('')
+          setRefundReason('')
+          setRefundFormError(null)
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Refund payment</DialogTitle>
+            <DialogDescription>
+              Enter the refund amount and recipient for this confirmed payment.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleRefund} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="refund-amount">Refund amount</Label>
+              <Input
+                id="refund-amount"
+                type="text"
+                inputMode="decimal"
+                placeholder={`Up to ${formatStroops(refundTarget?.amount_stroops ?? 0n)} ${refundTarget?.asset ?? ''}`}
+                value={refundAmount}
+                onChange={(event) => setRefundAmount(event.target.value)}
+                aria-invalid={Boolean(refundFormError)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="refund-recipient">Recipient address</Label>
+              <Input
+                id="refund-recipient"
+                type="text"
+                value={refundRecipient}
+                onChange={(event) => setRefundRecipient(event.target.value)}
+                aria-invalid={Boolean(refundFormError)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="refund-reason">Reason (optional)</Label>
+              <Textarea
+                id="refund-reason"
+                value={refundReason}
+                onChange={(event) => setRefundReason(event.target.value)}
+                rows={3}
+                placeholder="Customer requested a refund"
+              />
+            </div>
+            {refundFormError && (
+              <p className="text-sm text-destructive">{refundFormError}</p>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setRefundDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={refundingId !== null || !refundTarget}>
+                {refundingId === refundTarget?.id ? 'Refunding…' : 'Confirm refund'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <section className="mt-8 space-y-3">
         <h2 className="text-lg font-semibold">Refunds</h2>
