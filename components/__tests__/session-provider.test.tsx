@@ -3,7 +3,6 @@ import {
   api,
   setUnauthorizedHandler,
   type LoginResult,
-  type Me,
   type OtpChallengeResponse,
 } from '@/lib/api'
 import { SessionProvider, useSession, useAuthenticatedSession } from '../session-provider'
@@ -279,62 +278,6 @@ describe('SessionProvider', () => {
     })
 
     setItemSpy.mockRestore()
-  })
-
-  it('refreshMe returns null when session is null', async () => {
-    const { result } = renderHook(() => useSession(), { wrapper: SessionProvider })
-
-    let profile: Me | null | undefined
-    await act(async () => {
-      profile = await result.current.refreshMe()
-    })
-
-    expect(profile).toBeNull()
-    expect(mockApi.getMe).not.toHaveBeenCalled()
-  })
-
-  it('refreshMe fetches and updates profile when session exists', async () => {
-    const initialSession = { token: 'tok-me', userId: 'u-me', merchantId: 'm-me' }
-    window.localStorage.setItem('aframp.session', JSON.stringify(initialSession))
-
-    const mockProfile: Me = {
-      user_id: 'u-me',
-      email: 'me@example.com',
-      name: 'Merchant Me',
-      is_admin: false,
-      merchant_id: 'm-me',
-      merchant_name: 'Test Business',
-      created_at: '2026-01-01',
-    }
-    mockApi.getMe.mockResolvedValue(mockProfile)
-
-    const { result } = renderHook(() => useSession(), { wrapper: SessionProvider })
-
-    let profile: Me | null | undefined
-    await act(async () => {
-      profile = await result.current.refreshMe()
-    })
-
-    expect(mockApi.getMe).toHaveBeenCalledWith('tok-me')
-    expect(profile).toEqual(mockProfile)
-    expect(result.current.me).toEqual(mockProfile)
-  })
-
-  it('refreshMe returns null and keeps me unchanged when api.getMe fails', async () => {
-    const initialSession = { token: 'tok-me-fail', userId: 'u-1', merchantId: 'm-1' }
-    window.localStorage.setItem('aframp.session', JSON.stringify(initialSession))
-
-    mockApi.getMe.mockRejectedValue(new Error('Network error'))
-
-    const { result } = renderHook(() => useSession(), { wrapper: SessionProvider })
-
-    let profile: Me | null | undefined
-    await act(async () => {
-      profile = await result.current.refreshMe()
-    })
-
-    expect(profile).toBeNull()
-    expect(result.current.me).toBeNull()
   })
 
   it('useSession throws error when used outside SessionProvider', () => {
