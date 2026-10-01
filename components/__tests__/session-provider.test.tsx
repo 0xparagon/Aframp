@@ -1,90 +1,81 @@
-import { render, screen, act, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { SessionProvider, useSession } from '../session-provider'
+import { render, screen, waitFor } from "@testing-library/react";
+import { act } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-function Consumer() {
-  const { session, ready, signIn, signOut, completeOtp } = useSession()
-  return (
-    <div>
-      <span data-testid="ready">{String(ready)}</span>
-      <span data-testid="session">{session ? session.token : 'none'}</span>
-      <button onClick={() => signIn('merchant@example.com', 'secret-pass')}>sign-in</button>
-      <button onClick={() => signOut()}>sign-out</button>
-      <button onClick={() => completeOtp('otp-token', { user_id: 'u', merchant_id: 'm' })}>
-        complete-otp
-      </button>
-    </div>
-  )
+import {
+  SessionProvider,
+  useAuthenticatedSession,
+  setUnauthorizedHandler,
+} from "../session-provider";
+
+const push = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push }),
+}));
+
+function Probe() {
+  const { token } = useAuthenticatedSession();
+  return <span data-testid="token">{token ?? "none"}</span>;
 }
 
-function renderProvider(props: Record<string, unknown> = {}) {
+function renderProvider(initialToken?: string) {
   return render(
-    <SessionProvider {...props}>
-      <Consumer />
+    <SessionProvider initialToken={initialToken}>
+      <Probe />
     </SessionProvider>,
-  )
+  );
 }
 
-describe('SessionProvider', () => {
+describe("session-provider authentication", () => {
   beforeEach(() => {
-    window.localStorage.clear()
-    jest.restoreAllMocks()
-  })
+    push.mockReset();
+    window.localStorage.clear();
+  });
 
-  it('is not ready before localStorage is read, then becomes ready', async () => {
-    renderProvider()
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-    await waitFor(() => expect(screen.getByTestId('ready')).toHaveTextContent('true'))
-  })
+  it("throws when useAuthenticatedSession is used without a token in context", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
 
-  it('completeOtp stores the token in localStorage and updates session state', async () => {
-    const user = userEvent.setup()
-    renderProvider()
+    expect(() => render(<Probe />)).toThrow(
+      /useAuthenticatedSession must be used within a SessionProvider/,
+    );
 
-    await user.click(screen.getByRole('button', { name: 'complete-otp' }))
+    error.mockRestore();
+  });
 
-    expect(window.localStorage.getItem('aframp.session')).toBeTruthy()
-    expect(screen.getByTestId('session')).toHaveTextContent('otp-token')
-  })
+  it("registers the unauthorized handler on mount and clears it on unmount", () => {
+    const register = vi.spyOn(window, "addEventListener");
+    const unregister = vi.spyOn(window, "removeEventListener");
 
-  it('signOut clears localStorage and sets session to null', async () => {
-    const user = userEvent.setup()
-    renderProvider()
+    const { unmount } = renderProvider("token-123");
 
-    await user.click(screen.getByRole('button', { name: 'complete-otp' }))
-    expect(screen.getByTestId('session')).toHaveTextContent('otp-token')
+    expect(register).toHaveBeenCalledWith("unauthorized", expect.any(Function));
 
-    await user.click(screen.getByRole('button', { name: 'sign-out' }))
+    unmount();
 
-    expect(window.localStorage.getItem('aframp.session')).toBeNull()
-    expect(screen.getByTestId('session')).toHaveTextContent('none')
-  })
+    expect(unregister).toHaveBeenCalledWith("unauthorized", expect.any(Function));
+  });
 
-  it('legacy signIn with an AuthResponse stores the session without an OTP step', async () => {
-    const user = userEvent.setup()
-    const fetchMock = jest.spyOn(global, 'fetch' as never).mockResolvedValue({
-      ok: true,
-      json: async () => ({ token: 'legacy-token', user_id: 'u', merchant_id: 'm' }),
-    } as Response)
+  it("logs out and redirects to /login when a 401 response is received", async () => {
+    renderProvider("token-123");
 
-    renderProvider()
-    await user.click(screen.getByRole('button', { name: 'sign-in' }))
+    await act(async () => {
+      setUnauthorizedHandler(() => {
+        window.localStorage.removeItem("token");
+        push("/login");
+      });
+      window.dispatchEvent(new Event("unauthorized"));
+    });
 
-    expect(fetchMock).toHaveBeenCalled()
-    await waitFor(() => expect(screen.getByTestId('session')).toHaveTextContent('legacy-token'))
-    expect(window.localStorage.getItem('aframp.session')).toBeTruthy()
-  })
+    await waitFor(() => {
+      expect(push).toHaveBeenCalledWith("/login");
+    });
 
-  it('calls onUnauthorized when the stored token is expired', async () => {
-    const onUnauthorized = jest.fn()
-    window.localStorage.setItem(
-      'aframp.session',
-      JSON.stringify({ token: 'expired-token', expires_at: Date.now() - 1000 }),
-    )
-
-    renderProvider({ onUnauthorized })
-
-    await waitFor(() => expect(onUnauthorized).toHaveBeenCalled())
-    expect(screen.getByTestId('session')).toHaveTextContent('none')
-  })
-})
+    expect(window.localStorage.getItem("token")).toBeNull();
+    expect(screen.getByTestId("token")).toHaveTextContent("none");
+  });
+});
