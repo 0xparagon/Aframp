@@ -9,8 +9,9 @@ import { cn } from '@/lib/utils'
 import { RecentRecipients, Contact } from './recent-recipients'
 import { QRScanner } from './qr-scanner'
 import { TransactionConfirmation } from './transaction-confirmation'
-import { type Balance } from '@/lib/api'
-import { formatStroops } from '@/lib/money'
+import { api, type Balance } from '@/lib/api'
+import { formatStroops, parseAmountToStroops } from '@/lib/money'
+import { useAuthenticatedSession } from '@/components/session-provider'
 
 type Step = 'recipient' | 'amount' | 'confirm' | 'success' | 'failure'
 
@@ -68,6 +69,7 @@ export interface SendPageClientProps {
 
 export function SendPageClient({ balances = [] }: SendPageClientProps) {
   const router = useRouter()
+  const { token } = useAuthenticatedSession()
   const assets = buildAssets(balances)
   const [step, setStep] = useState<Step>('recipient')
   const [scannerOpen, setScannerOpen] = useState(false)
@@ -160,13 +162,32 @@ export function SendPageClient({ balances = [] }: SendPageClientProps) {
   }, [step, form.amount])
 
   const handleSend = async () => {
-    setIsSending(true)
     setError(null)
     setFailureReason(null)
+
+    const destinationAddress = form.recipient?.address
+    if (!destinationAddress) {
+      setError('No recipient address provided.')
+      setStep('failure')
+      return
+    }
+
+    const amountStroops = parseAmountToStroops(form.amount)
+    if (!amountStroops || amountStroops <= 0n) {
+      setError('Invalid amount.')
+      setStep('failure')
+      return
+    }
+
+    setIsSending(true)
     try {
-      // Simulate API call with a chance of failure for testing
-      await new Promise((resolve) => setTimeout(resolve, 2200))
-      // In production, this would be: await api.createRemittance(...)
+      await api.createRemittance(
+        token,
+        destinationAddress,
+        amountStroops,
+        form.asset.symbol,
+        form.note || undefined
+      )
       setIsSending(false)
       setStep('success')
 
