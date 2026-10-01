@@ -79,7 +79,12 @@ export default function HomePage() {
       </div>
 
       <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <section className="bg-panel border-hairline rounded-2xl border p-5">
+        <section
+          className="bg-panel border-hairline rounded-2xl border p-5"
+          aria-live="polite"
+          aria-atomic="true"
+          aria-label="Available balance"
+        >
           <p className="text-dim text-xs">Available to cash out</p>
           {balances.length === 0 ? (
             <p className="mt-1 text-4xl font-bold tracking-tight tabular-nums">

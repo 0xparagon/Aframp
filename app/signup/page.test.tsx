@@ -50,6 +50,36 @@ describe('SignupPage', () => {
     expect(signUp).not.toHaveBeenCalled()
   })
 
+  it('shows a validation error when the email is empty', async () => {
+    const user = userEvent.setup()
+    render(<SignupPage />)
+
+    await user.type(screen.getByLabelText(/business name/i), 'Acme Pay')
+    await user.type(screen.getByLabelText(/phone number/i), '08011122233')
+    await user.type(screen.getByLabelText(/password/i), 'verysecret')
+    await user.click(screen.getByRole('button', { name: /create account/i }))
+
+    expect(
+      screen.getByText('Please fill in your business name, email, password, and phone number.')
+    ).toBeInTheDocument()
+    expect(signUp).not.toHaveBeenCalled()
+  })
+
+  it('shows a validation error when the password is empty', async () => {
+    const user = userEvent.setup()
+    render(<SignupPage />)
+
+    await user.type(screen.getByLabelText(/business name/i), 'Acme Pay')
+    await user.type(screen.getByLabelText(/email/i), 'hello@acme.com')
+    await user.type(screen.getByLabelText(/phone number/i), '08011122233')
+    await user.click(screen.getByRole('button', { name: /create account/i }))
+
+    expect(
+      screen.getByText('Please fill in your business name, email, password, and phone number.')
+    ).toBeInTheDocument()
+    expect(signUp).not.toHaveBeenCalled()
+  })
+
   it('calls signUp with the entered values and routes to /verify with the challenge', async () => {
     const user = userEvent.setup()
     signUp.mockResolvedValue({ challenge_id: 'chal-456', expires_in_secs: 600 })

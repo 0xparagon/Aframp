@@ -82,7 +82,7 @@ export default function WalletPage() {
 
       <div className="mt-6 max-w-xl space-y-5">
         {error && (
-          <Alert variant="destructive">
+          <Alert variant="destructive" role="alert">
             <AlertDescription>
               {error === 'backend-down'
                 ? "We can't connect to the payment server right now. Please try again in a moment."
@@ -92,7 +92,12 @@ export default function WalletPage() {
         )}
 
         {wallet && balances.length > 0 && (
-          <section className="bg-panel border-hairline space-y-4 rounded-2xl border p-5">
+          <section
+            aria-live="polite"
+            aria-atomic="true"
+            aria-label="Balances"
+            className="bg-panel border-hairline space-y-4 rounded-2xl border p-5"
+          >
             <h2 className="text-dim text-xs font-bold tracking-widest uppercase">Balances</h2>
             <ul className="space-y-4">
               {balances.map((balance) => (
