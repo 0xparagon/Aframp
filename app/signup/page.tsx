@@ -12,7 +12,11 @@ import { useSession } from '@/components/session-provider'
 import { isOffline } from '@/lib/api'
 import { CHALLENGE_SESSION_KEY } from '@/app/login/page'
 
+import { getPasswordStrength, isCommonPassword } from '@/lib/password-strength'
+
 const MIN_PASSWORD_LENGTH = 8
+
+const STRENGTH_COLOR = ['bg-destructive', 'bg-destructive', 'bg-yellow-500', 'bg-green-500', 'bg-green-600']
 
 export default function SignupPage() {
   const { session, ready, signUp } = useSession()
@@ -20,7 +24,9 @@ export default function SignupPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [phone, setPhone] = useState('')
+  const strength = getPasswordStrength(password)
   const [error, setError] = useState<string | null>(null)
   const [offline, setOffline] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -43,6 +49,18 @@ export default function SignupPage() {
     // Mirrors the server's own check so the error lands next to the field.
     if (password.length < MIN_PASSWORD_LENGTH) {
       setError(`Use at least ${MIN_PASSWORD_LENGTH} characters for your password.`)
+      setSubmitting(false)
+      return
+    }
+
+    if (isCommonPassword(password)) {
+      setError('That password is too common. Choose something harder to guess.')
+      setSubmitting(false)
+      return
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.')
       setSubmitting(false)
       return
     }
@@ -127,9 +145,43 @@ export default function SignupPage() {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
-          <p className="text-muted-foreground text-xs">
-            At least {MIN_PASSWORD_LENGTH} characters.
-          </p>
+          {password ? (
+            <div aria-live="polite" className="space-y-1">
+              <div className="flex gap-1" aria-hidden>
+                {[1, 2, 3, 4].map((segment) => (
+                  <div
+                    key={segment}
+                    className={`h-1 flex-1 rounded-full ${
+                      strength.score >= segment ? STRENGTH_COLOR[strength.score] : 'bg-muted'
+                    }`}
+                  />
+                ))}
+              </div>
+              <p className="text-muted-foreground text-xs">
+                Strength: {strength.label}
+                {strength.isCommon && ' — this is a very common password'}
+              </p>
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-xs">
+              At least {MIN_PASSWORD_LENGTH} characters. Mix letters, numbers and symbols.
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="confirm-password">Confirm password</Label>
+          <Input
+            id="confirm-password"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+          />
+          {confirmPassword && confirmPassword !== password && (
+            <p className="text-destructive text-xs">Passwords don&apos;t match.</p>
+          )}
         </div>
 
         <Button type="submit" size="lg" disabled={submitting} className="mt-2">
