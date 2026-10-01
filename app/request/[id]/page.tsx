@@ -14,6 +14,9 @@ import { formatStroops } from '@/lib/money'
 /** The backend confirms a deposit within one Horizon poll cycle (60s default). */
 const POLL_INTERVAL_MS = 3000
 
+/** Stop polling after this many consecutive failed loads. */
+const MAX_CONSECUTIVE_ERRORS = 3
+
 function secondsUntil(iso: string): number {
   return Math.max(0, Math.floor((new Date(iso).getTime() - Date.now()) / 1000))
 }
@@ -55,10 +58,24 @@ export default function PaymentRequestPage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     const controller = new AbortController()
     let timer: ReturnType<typeof setTimeout>
+    let consecutiveErrors = 0
 
     const tick = async () => {
       const next = await load(controller.signal)
       if (controller.signal.aborted) return
+
+      if (next) {
+        // Successful load — reset the backoff counter.
+        consecutiveErrors = 0
+      } else {
+        consecutiveErrors += 1
+        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+          // Give up polling and let the user retry manually.
+          setError('backend-down')
+          return
+        }
+      }
+
       if (!next || next.status === 'pending') {
         timer = setTimeout(tick, POLL_INTERVAL_MS)
       }
@@ -217,18 +234,8 @@ export default function PaymentRequestPage({ params }: { params: Promise<{ id: s
         aria-live="polite"
       >
         <Clock className="size-4" aria-hidden />
-        Expires in <span className="tabular-nums">{formatCountdown(remaining)}</span>
+        {remaining > 0 ? `Expires in ${formatCountdown(remaining)}` : 'Expiring…'}
       </p>
-
-      <div className="space-y-2">
-        <Button asChild variant="outline" size="lg" className="w-full">
-          <Link href="/charge">Back to keypad</Link>
-        </Button>
-        {/* There's no cancel endpoint — a request can only expire on its own. */}
-        <p className="text-muted-foreground text-center text-xs">
-          This code stays payable until it expires.
-        </p>
-      </div>
     </main>
   )
 }

@@ -53,9 +53,17 @@ The client-side contract is documented in the repository root OpenAPI file:
 
 This spec covers the backend endpoints used by the frontend in [lib/api.ts](lib/api.ts).
 
+### PWA Status
+
+Offline caching and installable PWA support are currently disabled. Web Push payment alerts
+remain available through a push-only service worker; the app does not cache pages or API data
+for offline use.
+
 ## �🚀 Quick Start (5 Minutes)
 
 Get AFRAMP running locally in under 5 minutes with our automated setup script or manual installation.
+
+> ⚠️ **Port constraint — read this first.** The backend binds port **3000** and its `CORS_ALLOWED_ORIGINS` defaults to `http://localhost:3001`. The frontend must therefore run on **3001**, not Next.js's default 3000. If you start the app on 3000, every API request will fail with a silent CORS/network error. Set `NEXT_PUBLIC_API_URL` to point at the backend and run the frontend on 3001 (see `.env.example`).
 
 ### Automated Setup (Easiest) ⚡
 
@@ -83,7 +91,7 @@ The script will:
 - ✅ Let you choose Docker or Node.js setup
 - ✅ Install dependencies and start the app
 
-Access the app at `http://localhost:3000` ✅
+Access the app at `http://localhost:3001` ✅
 
 ### Manual Setup
 
@@ -99,7 +107,7 @@ cp .env.example .env.local
 docker-compose -f docker-compose.dev.yml up
 ```
 
-Access the app at `http://localhost:3000` ✅
+Access the app at `http://localhost:3001` ✅ (the frontend is mapped to 3001 so it matches the backend's default `CORS_ALLOWED_ORIGINS`; see `docker-compose.dev.yml`).
 
 #### Option 2: Node.js
 
@@ -113,10 +121,10 @@ npm install
 
 # Configure and run
 cp .env.example .env.local
-npm run dev
+npm run dev -- -p 3001
 ```
 
-Access the app at `http://localhost:3000` ✅
+Access the app at `http://localhost:3001` ✅ (run on 3001 so the backend's default `CORS_ALLOWED_ORIGINS=http://localhost:3001` accepts your requests).
 
 ---
 
@@ -175,6 +183,8 @@ docker-compose logs -f
 # Stop containers
 docker-compose down
 ```
+
+> ⚠️ The dev compose file maps the frontend to port **3001** because the backend binds 3000 and only allows `http://localhost:3001` by default via `CORS_ALLOWED_ORIGINS`. See `docker-compose.dev.yml` for the inline explanation.
 
 ### Production
 
@@ -256,132 +266,35 @@ docker push your-registry/aframp:latest
 
 ---
 
+## 🛠️ Troubleshooting
+
+### All API calls fail with a network error
+
+If every request to the backend fails (browser console shows CORS errors or `net::ERR_FAILED`), you are almost certainly running the frontend on the wrong port.
+
+- The backend binds port **3000** and its `CORS_ALLOWED_ORIGINS` defaults to `http://localhost:3001`.
+- Next.js defaults to port **3000**, which collides with the backend and is not in the allowed origins list.
+
+**Fix:** run the frontend on **3001** and point it at the backend:
+
+```bash
+# Node.js
+npm run dev -- -p 3001
+
+# Docker (already configured in docker-compose.dev.yml)
+docker-compose -f docker-compose.dev.yml up
+```
+
+Make sure `.env.local` sets `NEXT_PUBLIC_API_URL` to the backend URL (e.g. `http://localhost:3000`) and that the backend's `CORS_ALLOWED_ORIGINS` includes your frontend origin (`http://localhost:3001` by default). See `.env.example` for details.
+
+---
+
 ## 📦 Available Scripts
 
 | Command                 | Description                                    |
-| ----------------------- | ---------------------------------------------- |
-| `npm run dev`           | Start development server with hot-reload       |
-| `npm run build`         | Build optimized production bundle              |
-| `npm start`             | Start production server (requires build first) |
-| `npm test`              | Run Jest test suite                            |
-| `npm run test:watch`    | Run tests in watch mode                        |
-| `npm run test:coverage` | Generate test coverage report                  |
-| `npm run lint`          | Check code for linting errors                  |
-| `npm run format`        | Format code with Prettier                      |
-| `npm run type-check`    | Run TypeScript type checking                   |
-
----
-
-## 🔍 Development Prerequisites
-
-### Required
-
-- **Node.js** v18 or higher
-- **npm** v9 or higher
-- **Git**
-- Modern web browser (Chrome, Firefox, Safari, Edge)
-
-### Recommended
-
-- **Docker Desktop** (for containerized development)
-- **Stellar Freighter Wallet** (browser extension for testing)
-- **VS Code** with recommended extensions:
-  - ESLint
-  - Prettier
-  - Tailwind CSS IntelliSense
-  - TypeScript and JavaScript Language Features
-
-### Verify Installation
-
-```bash
-node --version  # Should be v18+
-npm --version   # Should be v9+
-docker --version  # Optional but recommended
-```
-
----
-
-## 💳 Onramp Page (Wallet-Connected Flow)
-
-The onramp page lives at `/onramp` and assumes a connected Stellar wallet address is already stored in `localStorage`.
-
-### Run Locally
-
-1. Start the dev server (see setup above).
-2. Visit `http://localhost:3000/onramp`.
-3. Ensure `localStorage.walletAddress` is set to a valid Stellar address (56 characters, starts with `G`).
-
-### Environment Variables
-
-No additional environment variables are required for the onramp page. Exchange rates are fetched from CoinGecko on the client.
-
-### Supported Currencies & Assets
-
-- Fiat: NGN, KES, GHS, ZAR, UGX
-- Crypto: cNGN, cKES, cGHS, USDC, XLM
-
-### Payment Methods & Fees
-
-- Bank Transfer: 0% processing fee
-- Card Payment: 1.5% processing fee
-- Mobile Money: 0.5% processing fee
-
-### Known Limitations
-
-- Wallet switching is a client-only selector and does not yet integrate with Freighter accounts.
-- Exchange rates are best-effort with cached fallbacks on API failure.
-
----
-
-## 🧪 Testing & Quality
-
-- **Run Unit Tests:** Execute `npm test` to launch the test runner.
-- **Code Linting:** Use `npm run lint` to check code style and catch errors.
-- **Build for Production:** Run `npm run build` to create an optimized production build in the `build/` folder.
-
----
-
-## 🤝 How to Contribute
-
-We welcome contributions from the community! To ensure a smooth process, please follow these guidelines.
-
-### Contribution Workflow
-
-1.  **Fork the Repository**: Start by forking the main AFRAMP repository to your own GitHub account.
-2.  **Create a Feature Branch**: In your fork, create a new branch for your work (e.g., `feat/add-new-component` or `fix/transaction-bug`).
-3.  **Implement Your Changes**: Write clear, well-commented code. Ensure your changes align with the project's architecture, which integrates with Stellar's ecosystem protocols (SEPs) for ramps and authentication.
-4.  **Test Thoroughly**: Verify your changes work correctly and don't break existing functionality.
-5.  **Submit a Pull Request (PR)**: Push your branch to your fork and open a PR against the main repository's `develop` or `main` branch. Clearly describe the problem and your solution.
-
-### Pull Request Requirements
-
-- **Title & Description**: Use a clear title and provide a detailed description of the changes.
-- **Linked Issue**: Reference any related GitHub issue.
-- **Code Quality**: Code must pass linting checks and existing tests.
-- **Screenshots**: For UI changes, include before/after screenshots or screen recordings.
-
-### Community & Conduct
-
-We strive to maintain a respectful and inclusive environment. Please be constructive in discussions and reviews. Major feature proposals are best discussed by opening an issue first.
-
----
-
-## 📚 Helpful Links & Resources
-
-- **Stellar Documentation**: The foundation of our platform.
-  - [Stellar Ecosystem Proposals (SEPs)](#)
-  - [Anchor Platform Guide](#)
-- **AFRAMP Backend Repository**: [Link to backend service repo]
-- **Live Application**: [https://app.aframp.com](https://aframp.vercel.app/)
-- **Verification Portal**: [https://verify.aframp.com](#) _(Live transaction explorer)_
-- **Open an Issue**: Use GitHub Issues to report bugs or request features.
-
----
-
-## 📄 License
-
-This project is licensed under the **Apache 2.0 License**. By contributing, you agree that your contributions will be licensed under the same license.
-
----
+| ----------------------- | -----------------
 
 _Built for Africa, Verified by Blockchain. Onramp to the future. Offramp to opportunity._ 🔗🌍
+
+## Handsoff notes
+
