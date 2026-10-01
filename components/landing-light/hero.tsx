@@ -30,7 +30,7 @@ export function Hero() {
         {/* Lifted from the design export — the render sits on the same
             brand green, so its transparent edges blend exactly. */}
         <Image
-          src="/landing/hero-coins.png"
+          src="/landing/hero-coins.webp"
           alt=""
           aria-hidden="true"
           width={705}
