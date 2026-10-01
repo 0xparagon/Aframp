@@ -16,6 +16,7 @@ import {
 
 import { AframpMark } from '@/components/brand/aframp-mark'
 import { useSession } from '@/components/session-provider'
+import { useStellarStatus } from '@/hooks/use-stellar-status'
 import { cn } from '@/lib/utils'
 
 const LINKS = [
@@ -33,12 +34,27 @@ export function WalletSidebar() {
   const pathname = usePathname()
   const { signOut } = useSession()
   const router = useRouter()
+  const { status: stellarStatus, description: stellarDescription } = useStellarStatus()
+
+  const statusColor =
+    stellarStatus === 'operational'
+      ? 'bg-green-500'
+      : stellarStatus === 'degraded'
+        ? 'bg-amber-500'
+        : stellarStatus === 'outage'
+          ? 'bg-red-500'
+          : 'bg-gray-500'
 
   return (
     <aside className="bg-rail border-hairline sticky top-0 flex h-dvh w-[260px] shrink-0 flex-col border-r p-4 pb-6">
       <div className="flex items-center gap-2.5 px-1 pt-1">
         <AframpMark className="size-8" />
         <span className="text-xl font-bold tracking-tight text-white">Aframp</span>
+        <div
+          className={cn('size-2.5 rounded-full', statusColor)}
+          title={`Stellar Network: ${stellarDescription}`}
+          aria-label={`Stellar Network status: ${stellarDescription}`}
+        />
       </div>
       <p className="text-dim mt-1.5 px-1 text-xs">Merchant dashboard</p>
 
