@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,6 +22,27 @@ const STATUS_LABEL: Record<PaymentStatus, string> = {
   verified: 'Verifying',
   confirmed: 'Paid',
   failed: 'Failed',
+}
+
+const FILTERABLE_STATUSES: PaymentStatus[] = ['detected', 'verified', 'confirmed', 'failed']
+
+function DebouncedSearchInput({ onSearch }: { onSearch: (query: string) => void }) {
+  const [query, setQuery] = useState('')
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => onSearch(query), 250)
+    return () => window.clearTimeout(timeout)
+  }, [onSearch, query])
+
+  return (
+    <Input
+      id="transaction-search"
+      type="search"
+      placeholder="Hash, wallet address, or asset"
+      value={query}
+      onChange={(event) => setQuery(event.target.value)}
+    />
+  )
 }
 
 function statusVariant(status: PaymentStatus) {
@@ -152,6 +173,13 @@ export default function TransactionsPage() {
     return () => controller.abort()
   }, [load])
 
+  const filteredPayments = useMemo(() => {
+    if (!payments) return []
+    const searched = searchPayments(payments, searchQuery)
+    const statusFiltered = filterPaymentsByStatus(searched, statusFilter)
+    return filterPaymentsByDateRange(statusFiltered, fromDate, toDate)
+  }, [payments, searchQuery, statusFilter, fromDate, toDate])
+
   if (error)
     return (
       <ErrorState
@@ -181,7 +209,7 @@ export default function TransactionsPage() {
           </div>
         )}
         {balances.length > 0 && (
-          <ul className="grid gap-2 sm:grid-cols-2">
+          <ul aria-live="polite" aria-atomic="true" className="grid gap-2 sm:grid-cols-2">
             {balances.map((balance) => (
               <li
                 key={balance.asset}
@@ -236,7 +264,12 @@ export default function TransactionsPage() {
                     {refundingId === payment.id ? 'Refunding…' : 'Refund'}
                   </Button>
                 )}
-                <Badge variant={statusVariant(payment.status)}>
+                <Badge
+                  variant={statusVariant(payment.status)}
+                  role="status"
+                  aria-live="polite"
+                  aria-label={`Payment status: ${STATUS_LABEL[payment.status] ?? payment.status}`}
+                >
                   {STATUS_LABEL[payment.status] ?? payment.status}
                 </Badge>
               </div>
@@ -317,11 +350,19 @@ export default function TransactionsPage() {
         ) : (
           <ul className="border-hairline divide-y rounded-2xl border">
             {refunds.map((refund) => (
-              <li key={refund.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+              <li
+                key={refund.id}
+                className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+              >
                 <span className="tabular-nums font-medium">
                   {formatStroops(refund.amount_stroops)} {refund.asset}
                 </span>
-                <Badge variant={refund.status === 'completed' ? 'default' : 'secondary'}>
+                <Badge
+                  variant={refund.status === 'completed' ? 'default' : 'secondary'}
+                  role="status"
+                  aria-live="polite"
+                  aria-label={`Refund status: ${refund.status}`}
+                >
                   {refund.status}
                 </Badge>
               </li>

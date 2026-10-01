@@ -53,6 +53,12 @@ The client-side contract is documented in the repository root OpenAPI file:
 
 This spec covers the backend endpoints used by the frontend in [lib/api.ts](lib/api.ts).
 
+### PWA Status
+
+Offline caching and installable PWA support are currently disabled. Web Push payment alerts
+remain available through a push-only service worker; the app does not cache pages or API data
+for offline use.
+
 ## �🚀 Quick Start (5 Minutes)
 
 Get AFRAMP running locally in under 5 minutes with our automated setup script or manual installation.
@@ -385,3 +391,8 @@ This project is licensed under the **Apache 2.0 License**. By contributing, you 
 ---
 
 _Built for Africa, Verified by Blockchain. Onramp to the future. Offramp to opportunity._ 🔗🌍
+
+## Handsoff notes
+
+<!-- handsoff-issue-517 -->
+- #517: test(charge): write tests for the charge numpad page
