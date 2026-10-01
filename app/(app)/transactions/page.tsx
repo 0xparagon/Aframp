@@ -1,13 +1,27 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { ErrorState } from '@/components/ui/error-state'
 import { EmptyStateIllustration } from '@/components/ui/empty-state-illustration'
-import { api, ApiError, type Balance, type Payment, type PaymentStatus, type Refund } from '@/lib/api'
+import {
+  api,
+  ApiError,
+  type Balance,
+  type Payment,
+  type PaymentStatus,
+  type Refund,
+} from '@/lib/api'
 import { formatStroops } from '@/lib/money'
+import {
+  filterPaymentsByDateRange,
+  filterPaymentsByStatus,
+  searchPayments,
+} from '@/lib/transaction-filters'
 import { useAuthenticatedSession } from '@/components/session-provider'
 
 /** Testnet today; swap for `public` when the backend points at mainnet Horizon. */
@@ -18,6 +32,27 @@ const STATUS_LABEL: Record<PaymentStatus, string> = {
   verified: 'Verifying',
   confirmed: 'Paid',
   failed: 'Failed',
+}
+
+const FILTERABLE_STATUSES: PaymentStatus[] = ['detected', 'verified', 'confirmed', 'failed']
+
+function DebouncedSearchInput({ onSearch }: { onSearch: (query: string) => void }) {
+  const [query, setQuery] = useState('')
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => onSearch(query), 250)
+    return () => window.clearTimeout(timeout)
+  }, [onSearch, query])
+
+  return (
+    <Input
+      id="transaction-search"
+      type="search"
+      placeholder="Hash, wallet address, or asset"
+      value={query}
+      onChange={(event) => setQuery(event.target.value)}
+    />
+  )
 }
 
 function statusVariant(status: PaymentStatus) {
@@ -42,6 +77,10 @@ export default function TransactionsPage() {
   const [refunds, setRefunds] = useState<Refund[]>([])
   const [refundingId, setRefundingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<PaymentStatus | 'all'>('all')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -98,6 +137,13 @@ export default function TransactionsPage() {
     void load(controller.signal)
     return () => controller.abort()
   }, [load])
+
+  const filteredPayments = useMemo(() => {
+    if (!payments) return []
+    const searched = searchPayments(payments, searchQuery)
+    const statusFiltered = filterPaymentsByStatus(searched, statusFilter)
+    return filterPaymentsByDateRange(statusFiltered, fromDate, toDate)
+  }, [payments, searchQuery, statusFilter, fromDate, toDate])
 
   if (error)
     return (
@@ -199,7 +245,10 @@ export default function TransactionsPage() {
         ) : (
           <ul className="border-hairline divide-y rounded-2xl border">
             {refunds.map((refund) => (
-              <li key={refund.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+              <li
+                key={refund.id}
+                className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+              >
                 <span className="tabular-nums font-medium">
                   {formatStroops(refund.amount_stroops)} {refund.asset}
                 </span>
