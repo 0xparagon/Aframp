@@ -51,8 +51,8 @@ function VerifyOtpForm() {
   const codeInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (ready && session) router.replace('/charge')
-  }, [ready, session, router])
+    if (ready && session) router.replace(flow === 'login' ? '/home' : '/charge')
+  }, [ready, session, router, flow])
 
   // There's no OTP flow without a challenge to verify — someone landed here
   // directly (bookmark, back button after completing it) rather than via
@@ -79,7 +79,7 @@ function VerifyOtpForm() {
     setSubmitting(true)
     try {
       await completeOtp(challengeId, code.trim())
-      router.replace('/charge')
+      router.replace(flow === 'login' ? '/home' : '/charge')
     } catch (cause) {
       if (cause instanceof ApiError && cause.code && TERMINAL_CODES.has(cause.code)) {
         setTerminal(true)
