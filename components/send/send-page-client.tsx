@@ -93,7 +93,7 @@ export function SendPageClient({ balances = [] }: SendPageClientProps) {
     } else if (step === 'confirm') {
       setStep('amount')
     } else {
-      router.push('/dashboard')
+      router.push('/home')
     }
   }
 
@@ -432,7 +432,7 @@ export function SendPageClient({ balances = [] }: SendPageClientProps) {
             failureReason={failureReason}
             onBack={() => step === 'failure' ? setStep('confirm') : setStep('amount')}
             onConfirm={handleSend}
-            onDone={() => router.push('/dashboard')}
+            onDone={() => router.push('/home')}
             onRetry={handleRetry}
           />
         )}

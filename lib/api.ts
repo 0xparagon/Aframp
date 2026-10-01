@@ -344,13 +344,17 @@ export interface PushSubscriptionStatus {
   enabled: boolean
 }
 
+const BIGINT_KEYS_PATTERN = Array.from(BIGINT_KEYS).join('|')
+
 /**
  * Re-quotes large integer values before JSON.parse can round them, then revives
- * registered fields as bigint. When adding a key to BIGINT_KEYS, also add it
- * to the field-name alternatives in this regex; see lib/__tests__/api.test.ts.
+ * BIGINT_KEYS fields as bigint. The field-name pattern is derived from BIGINT_KEYS.
  */
 export function parseWithBigInts<T>(text: string): T {
-  const quoted = text.replace(/"(amount_stroops|available|pending|fee_stroops|network_fee_stroops|total_stroops)"\s*:\s*(-?\d+)/g, '"$1":"$2"')
+  const quoted = text.replace(
+    new RegExp(`"(${BIGINT_KEYS_PATTERN})"\\s*:\\s*(-?\\d+)`, 'g'),
+    '"$1":"$2"'
+  )
   return JSON.parse(quoted, (key, value) =>
     BIGINT_KEYS.has(key) && typeof value === 'string' ? BigInt(value) : value
   ) as T
