@@ -213,6 +213,41 @@ describe('WithdrawPage', () => {
       )
     )
   })
+
+  it('falls back to hardcoded BANKS when /api/banks fetch fails', async () => {
+    const originalFetch = global.fetch
+    global.fetch = jest.fn().mockRejectedValue(new Error('Network error'))
+    try {
+      mockGetBalances.mockResolvedValue([balance('cNGN', 10_000_000_000n)])
+      render(<WithdrawPage />)
+      await screen.findByRole('heading', { name: 'Cash out' })
+      expect(await screen.findByText('Access Bank')).toBeInTheDocument()
+      expect(screen.getByText('Kuda Bank')).toBeInTheDocument()
+    } finally {
+      global.fetch = originalFetch
+    }
+  })
+
+  it('updates bank options when /api/banks fetch succeeds', async () => {
+    const originalFetch = global.fetch
+    global.fetch = jest.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: true,
+          data: [{ code: '999', name: 'Custom Live Bank' }],
+        }),
+        { status: 200 }
+      )
+    )
+    try {
+      mockGetBalances.mockResolvedValue([balance('cNGN', 10_000_000_000n)])
+      render(<WithdrawPage />)
+      await screen.findByRole('heading', { name: 'Cash out' })
+      expect(await screen.findByText('Custom Live Bank')).toBeInTheDocument()
+    } finally {
+      global.fetch = originalFetch
+    }
+  })
 })
 
 describe('session-provider authentication logic', () => {

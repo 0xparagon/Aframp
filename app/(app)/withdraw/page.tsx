@@ -24,6 +24,7 @@ import {
   getWithdrawalAssetConfig,
   type WithdrawalAsset,
 } from '@/lib/withdraw'
+import { BANKS, type Bank } from '@/lib/banks'
 
 const STATUS_LABEL: Record<WithdrawalStatus, string> = {
   pending: 'Pending',
@@ -43,6 +44,42 @@ export default function WithdrawPage() {
   const [accountNumber, setAccountNumber] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [nigeriaBanks, setNigeriaBanks] = useState<Bank[]>(BANKS)
+  const [banksLoading, setBanksLoading] = useState(false)
+
+  useEffect(() => {
+    let isMounted = true
+    async function loadBanks() {
+      setBanksLoading(true)
+      try {
+        const res = await fetch('/api/banks')
+        if (!res.ok) throw new Error('Failed to fetch banks')
+        const json = await res.json()
+        const list = Array.isArray(json) ? json : json?.data
+        if (Array.isArray(list) && list.length > 0 && isMounted) {
+          setNigeriaBanks(
+            list.map((b: { code: string | number; name: string }) => ({
+              code: String(b.code),
+              name: String(b.name),
+            }))
+          )
+        }
+      } catch {
+        if (isMounted) {
+          setNigeriaBanks(BANKS)
+        }
+      } finally {
+        if (isMounted) {
+          setBanksLoading(false)
+        }
+      }
+    }
+
+    void loadBanks()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -232,12 +269,16 @@ export default function WithdrawPage() {
 
           <div className="space-y-2">
             <Label htmlFor="bank">Bank</Label>
-            <Select value={bankCode} onValueChange={setBankCode} disabled={available === 0n}>
+            <Select
+              value={bankCode}
+              onValueChange={setBankCode}
+              disabled={available === 0n || banksLoading}
+            >
               <SelectTrigger id="bank">
-                <SelectValue placeholder="Choose your bank" />
+                <SelectValue placeholder={banksLoading ? 'Loading banks…' : 'Choose your bank'} />
               </SelectTrigger>
               <SelectContent>
-                {getBankOptions(asset).map((bank) => (
+                {(asset === 'cNGN' ? nigeriaBanks : getBankOptions(asset)).map((bank) => (
                   <SelectItem key={bank.code} value={bank.code}>
                     {bank.name}
                   </SelectItem>
