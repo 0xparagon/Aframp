@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, QrCode, ChevronRight, Wallet, StickyNote } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -102,6 +102,34 @@ export function SendPageClient() {
     }
     setForm((prev) => ({ ...prev, amount: prev.amount + key }))
   }
+
+  useEffect(() => {
+    if (step !== 'amount') return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const { key } = event
+
+      if (key >= '0' && key <= '9') {
+        event.preventDefault()
+        handleNumpad(key)
+        return
+      }
+
+      if (key === 'Backspace') {
+        event.preventDefault()
+        handleNumpad('⌫')
+        return
+      }
+
+      if (key === '.') {
+        event.preventDefault()
+        handleNumpad('.')
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [step, form.amount])
 
   const handleSend = async () => {
     setIsSending(true)
@@ -281,20 +309,30 @@ export function SendPageClient() {
 
             {/* Numpad */}
             <div className="grid grid-cols-3 gap-1.5 mt-auto">
-              {NUMPAD_KEYS.flat().map((key) => (
-                <button
-                  key={key}
-                  onClick={() => handleNumpad(key)}
-                  className={cn(
-                    'h-14 rounded-xl font-semibold text-lg transition-all duration-100 active:scale-95',
-                    key === '⌫'
-                      ? 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
-                      : 'bg-muted/50 hover:bg-muted/80 active:bg-muted'
-                  )}
-                >
-                  {key}
-                </button>
-              ))}
+              {NUMPAD_KEYS.flat().map((key) => {
+                const buttonLabel =
+                  key === '⌫'
+                    ? 'Delete amount'
+                    : key === '.'
+                      ? 'Add decimal point'
+                      : `Enter amount ${key}`
+
+                return (
+                  <button
+                    key={key}
+                    aria-label={buttonLabel}
+                    onClick={() => handleNumpad(key)}
+                    className={cn(
+                      'h-14 rounded-xl font-semibold text-lg transition-all duration-100 active:scale-95',
+                      key === '⌫'
+                        ? 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                        : 'bg-muted/50 hover:bg-muted/80 active:bg-muted'
+                    )}
+                  >
+                    {key}
+                  </button>
+                )
+              })}
             </div>
 
             {/* CTA */}
