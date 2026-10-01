@@ -1,6 +1,5 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 
@@ -11,53 +10,43 @@ import { QuickConvert } from '@/components/wallet/quick-convert'
 import { RevenueChart } from '@/components/wallet/revenue-chart'
 import { TopAssets } from '@/components/wallet/top-assets'
 import { ErrorState } from '@/components/ui/error-state'
-import { LoadingSpinner } from '@/components/ui/loading-spinner'
+import { HomePageSkeleton } from '@/components/wallet/home-page-skeleton'
 import { OnboardingChecklist } from '@/components/onboarding/onboarding-checklist'
-import { api, type Balance, type Payment, type PaymentRequest } from '@/lib/api'
+import { api, type Payment, type PaymentRequest } from '@/lib/api'
 import { useAuthenticatedSession } from '@/components/session-provider'
+import { useDataLoader } from '@/hooks/use-data-loader'
+import { useMemo } from 'react'
+
+interface DashboardData {
+  balances: Awaited<ReturnType<typeof api.getBalances>>
+  payments: Payment[]
+  requests: PaymentRequest[]
+}
 
 export default function HomePage() {
   const { token } = useAuthenticatedSession()
-  const [balances, setBalances] = useState<Balance[] | null>(null)
-  const [payments, setPayments] = useState<Payment[]>([])
-  const [openRequests, setOpenRequests] = useState<PaymentRequest[]>([])
-  const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(
-    async (signal?: AbortSignal) => {
-      setError(null)
-      try {
-        const [nextBalances, nextPayments, requests] = await Promise.all([
-          api.getBalances(token, signal),
-          api.listTransactions(token, 50, signal),
-          api.listPaymentRequests(token, 20, signal),
-        ])
-        setBalances(nextBalances)
-        setPayments(nextPayments)
-        setOpenRequests(requests.filter((request) => request.status === 'pending'))
-      } catch (cause) {
-        if (cause instanceof DOMException && cause.name === 'AbortError') return
-        setError(cause instanceof Error ? cause.message : 'Could not load your dashboard')
-        setBalances([])
-      }
+  const { data, error, loading, reload } = useDataLoader<DashboardData>(
+    async (signal) => {
+      const [balances, payments, requests] = await Promise.all([
+        api.getBalances(token, signal),
+        api.listTransactions(token, 50, signal),
+        api.listPaymentRequests(token, 20, signal),
+      ])
+      return { balances, payments, requests }
     },
     [token]
   )
 
-  useEffect(() => {
-    const controller = new AbortController()
-    void load(controller.signal)
-    return () => controller.abort()
-  }, [load])
+  const openRequests = useMemo(
+    () => data?.requests.filter((request) => request.status === 'pending') ?? [],
+    [data?.requests]
+  )
 
-  if (error) return <ErrorState message={error} onRetry={() => void load()} />
-  if (!balances) {
-    return (
-      <div className="flex justify-center py-16">
-        <LoadingSpinner />
-      </div>
-    )
-  }
+  if (error) return <ErrorState message={error} onRetry={reload} />
+  if (loading || !data) return <HomePageSkeleton />
+
+  const { balances, payments } = data
 
   return (
     <div>

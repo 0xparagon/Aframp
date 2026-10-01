@@ -52,7 +52,9 @@ export function OnboardingChecklist() {
 
   useEffect(() => {
     const nextChecklist = readChecklist()
-    const walletAddress = walletSession.getAddress() || window.localStorage.getItem('walletAddress') || ''
+    // walletSession stores the address in sessionStorage (per-tab).
+    // There is no localStorage fallback — that was a stale reference.
+    const walletAddress = walletSession.getAddress() ?? ''
 
     setChecklist(nextChecklist)
     setHasWallet(Boolean(walletAddress))

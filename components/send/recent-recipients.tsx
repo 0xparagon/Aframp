@@ -1,35 +1,83 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 
-interface RecentRecipient {
+export interface Contact {
+  id?: string
   address: string
   name: string
   avatar?: string
+  createdAt?: string
 }
 
 interface RecentRecipientsProps {
   onSelect: (address: string, name?: string, avatar?: string) => void
 }
 
-const RECENT_RECIPIENTS: RecentRecipient[] = [
+const DEFAULT_RECIPIENTS: Contact[] = [
   { address: 'GBA4B7H...S7N8', name: 'Ava Thompson', avatar: 'AT' },
   { address: 'GDQ2N8X...X2C9', name: 'Noah Kim', avatar: 'NK' },
   { address: 'GCK6M2Z...F5Q1', name: 'Mila Garcia', avatar: 'MG' },
 ]
 
+const STORAGE_KEY = 'aframp_contacts'
+
+export function getStoredContacts(): Contact[] {
+  if (typeof window === 'undefined') return DEFAULT_RECIPIENTS
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored) as Contact[]
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed
+      }
+    } else {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_RECIPIENTS))
+      return DEFAULT_RECIPIENTS
+    }
+  } catch (error) {
+    console.error('Failed to load contacts:', error)
+  }
+  return DEFAULT_RECIPIENTS
+}
+
+export function saveStoredContacts(contacts: Contact[]): void {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(contacts))
+  } catch (error) {
+    console.error('Failed to save contacts:', error)
+  }
+}
+
 export function RecentRecipients({ onSelect }: RecentRecipientsProps) {
+  const [contacts, setContacts] = useState<Contact[]>(DEFAULT_RECIPIENTS)
+
+  useEffect(() => {
+    const loaded = getStoredContacts()
+    if (loaded.length > 0) {
+      setContacts(loaded)
+    }
+  }, [])
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           Recent recipients
         </span>
-        <button type="button" className="text-xs text-emerald-500 font-medium hover:text-emerald-600">
+        <Link
+          href="/contacts"
+          className="text-xs text-emerald-500 font-medium hover:text-emerald-600 transition-colors"
+        >
           View all
-        </button>
+        </Link>
       </div>
 
       <div className="space-y-2">
-        {RECENT_RECIPIENTS.map((recipient) => (
+        {contacts.map((recipient) => (
           <button
             key={recipient.address}
             type="button"
@@ -41,7 +89,9 @@ export function RecentRecipients({ onSelect }: RecentRecipientsProps) {
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-medium text-foreground">{recipient.name}</div>
-              <div className="truncate font-mono text-[11px] text-muted-foreground">{recipient.address}</div>
+              <div className="truncate font-mono text-[11px] text-muted-foreground">
+                {recipient.address}
+              </div>
             </div>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </button>
