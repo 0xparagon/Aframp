@@ -46,6 +46,8 @@ export default function ProfilePage() {
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingEmail, setSavingEmail] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -147,6 +149,26 @@ export default function ProfilePage() {
       setError(cause instanceof Error ? cause.message : 'Could not delete account')
       setDeleting(false)
     }
+  }
+
+  function openDeleteDialog() {
+    setDeleteDialogOpen(true)
+    setDeleteConfirmEmail('')
+    setError(null)
+  }
+
+  function closeDeleteDialog() {
+    setDeleteDialogOpen(false)
+    setDeleteConfirmEmail('')
+  }
+
+  async function confirmDelete() {
+    if (deleteConfirmEmail.trim() !== displayEmail) {
+      setError('Email does not match')
+      return
+    }
+    setDeleteDialogOpen(false)
+    await deleteAccount()
   }
 
   if (loading && !me) {
@@ -300,29 +322,49 @@ export default function ProfilePage() {
           wallet, and API keys. This action cannot be undone.
         </p>
 
-        <AlertDialog>
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <AlertDialogTrigger asChild>
-            <Button variant="destructive" className="w-full sm:w-auto">
+            <Button variant="destructive" className="w-full sm:w-auto" onClick={openDeleteDialog}>
               <Trash2 className="size-4" aria-hidden /> Delete account
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Delete your account?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will permanently delete your merchant account, wallet, payment history, and all
-                API keys. Any pending payments or withdrawals will be lost. This action{' '}
-                <strong>cannot be undone</strong>.
+              <AlertDialogDescription className="space-y-3">
+                <p>
+                  This will permanently delete your merchant account, wallet, payment history, and all
+                  API keys. Any pending payments or withdrawals will be lost.
+                </p>
+                <p className="font-semibold text-destructive">
+                  This action cannot be undone.
+                </p>
+                <div className="space-y-2 pt-2">
+                  <Label htmlFor="delete-confirm-email" className="text-foreground">
+                    Type your email address to confirm: <strong>{displayEmail}</strong>
+                  </Label>
+                  <Input
+                    id="delete-confirm-email"
+                    type="email"
+                    placeholder={displayEmail}
+                    value={deleteConfirmEmail}
+                    onChange={(e) => setDeleteConfirmEmail(e.target.value)}
+                    disabled={deleting}
+                    autoComplete="off"
+                  />
+                </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={deleting} onClick={closeDeleteDialog}>
+                Cancel
+              </AlertDialogCancel>
               <AlertDialogAction
                 onClick={(e) => {
                   e.preventDefault()
-                  void deleteAccount()
+                  void confirmDelete()
                 }}
-                disabled={deleting}
+                disabled={deleting || deleteConfirmEmail.trim() !== displayEmail}
                 className="bg-destructive text-white hover:bg-destructive/90"
               >
                 {deleting ? 'Deleting…' : 'Yes, delete my account'}

@@ -1,12 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Copy, KeyRound, Plus, Trash2, X } from 'lucide-react'
+import { AlertTriangle, Copy, KeyRound, Plus, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -46,6 +47,8 @@ export default function ApiKeysPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [revokeDialogOpen, setRevokeDialogOpen] = useState(false)
   const [revokeTarget, setRevokeTarget] = useState<ApiKey | null>(null)
+  const [keyRevealDialogOpen, setKeyRevealDialogOpen] = useState(false)
+  const [hasAcknowledgedCopy, setHasAcknowledgedCopy] = useState(false)
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -83,6 +86,8 @@ export default function ApiKeysPage() {
       setNewKeyResult({ apiKey: result.api_key, fullKey: result.full_key })
       setNewKeyName('')
       setCreateDialogOpen(false)
+      setKeyRevealDialogOpen(true)
+      setHasAcknowledgedCopy(false)
       await load()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not create API key')
@@ -96,6 +101,13 @@ export default function ApiKeysPage() {
     await navigator.clipboard.writeText(newKeyResult.fullKey)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  function dismissNewKey() {
+    setNewKeyResult(null)
+    setKeyRevealDialogOpen(false)
+    setHasAcknowledgedCopy(false)
+    setCopied(false)
   }
 
   function openRevoke(key: ApiKey) {
@@ -117,10 +129,6 @@ export default function ApiKeysPage() {
     } finally {
       setRevokingId(null)
     }
-  }
-
-  function dismissNewKey() {
-    setNewKeyResult(null)
   }
 
   if (error && !keys) {
@@ -175,33 +183,97 @@ export default function ApiKeysPage() {
         </Dialog>
       </div>
 
-      {newKeyResult && (
-        <Alert className="border-amber-500/30 bg-amber-500/10">
-          <KeyRound className="size-4 text-amber-400" aria-hidden />
-          <AlertTitle className="text-amber-200">Your new API key</AlertTitle>
-          <AlertDescription className="mt-2 space-y-3">
-            <p className="text-sm text-amber-100/80">
-              Copy this now — you will never see it again.
-            </p>
-            <div className="flex items-center gap-2">
-              <code className="bg-raised flex-1 rounded-lg px-3 py-2 text-xs break-all font-mono text-white">
-                {newKeyResult.fullKey}
-              </code>
-              <Button
-                size="icon-sm"
-                variant="outline"
-                onClick={copyFullKey}
-                aria-label="Copy API key"
-              >
-                {copied ? <X className="size-4" /> : <Copy className="size-4" />}
-              </Button>
+      {/* One-time API key reveal dialog */}
+      <Dialog open={keyRevealDialogOpen} onOpenChange={(open) => {
+        // Only allow closing if acknowledged
+        if (!open && hasAcknowledgedCopy) {
+          dismissNewKey()
+        }
+      }}>
+        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => {
+          // Prevent closing by clicking outside until acknowledged
+          if (!hasAcknowledgedCopy) {
+            e.preventDefault()
+          }
+        }} onEscapeKeyDown={(e) => {
+          // Prevent closing by ESC until acknowledged
+          if (!hasAcknowledgedCopy) {
+            e.preventDefault()
+          }
+        }}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="size-5 text-amber-500" aria-hidden />
+              Save your API key now
+            </DialogTitle>
+            <DialogDescription>
+              This is the only time you'll see the full key. Copy it now and store it securely.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {newKeyResult && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-key">API Key</Label>
+                <div className="flex items-center gap-2">
+                  <code 
+                    id="new-key"
+                    className="bg-raised flex-1 rounded-lg px-3 py-2 text-xs break-all font-mono text-white"
+                  >
+                    {newKeyResult.fullKey}
+                  </code>
+                  <Button
+                    size="icon-sm"
+                    variant="outline"
+                    onClick={copyFullKey}
+                    aria-label="Copy API key"
+                  >
+                    {copied ? <X className="size-4" /> : <Copy className="size-4" />}
+                  </Button>
+                </div>
+              </div>
+
+              <Alert className="border-amber-500/30 bg-amber-500/10">
+                <AlertTriangle className="size-4 text-amber-400" aria-hidden />
+                <AlertDescription className="text-amber-100/90 text-sm">
+                  Once you close this dialog, the key will never be shown again. If you lose it, 
+                  you'll need to revoke this key and create a new one.
+                </AlertDescription>
+              </Alert>
+
+              <div className="flex items-start gap-3 rounded-lg border border-hairline bg-panel p-3">
+                <Checkbox
+                  id="acknowledge-copy"
+                  checked={hasAcknowledgedCopy}
+                  onCheckedChange={(checked) => setHasAcknowledgedCopy(checked === true)}
+                  aria-label="I have copied my key"
+                />
+                <div className="space-y-1">
+                  <Label 
+                    htmlFor="acknowledge-copy" 
+                    className="text-sm font-medium cursor-pointer"
+                  >
+                    I have copied my key
+                  </Label>
+                  <p className="text-dim text-xs">
+                    Check this box to confirm you've saved your API key
+                  </p>
+                </div>
+              </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={dismissNewKey} className="h-7 text-xs">
-              Dismiss
+          )}
+
+          <DialogFooter>
+            <Button
+              onClick={dismissNewKey}
+              disabled={!hasAcknowledgedCopy}
+              className="w-full"
+            >
+              Done
             </Button>
-          </AlertDescription>
-        </Alert>
-      )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {loading && !keys ? (
         <div className="flex justify-center py-16">
