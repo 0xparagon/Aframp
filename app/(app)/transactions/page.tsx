@@ -12,6 +12,11 @@ import { ErrorState } from '@/components/ui/error-state'
 import { EmptyStateIllustration } from '@/components/ui/empty-state-illustration'
 import { api, ApiError, type Balance, type Payment, type PaymentStatus, type Refund } from '@/lib/api'
 import { formatStroops, parseAmountToStroops } from '@/lib/money'
+import {
+  filterPaymentsByDateRange,
+  filterPaymentsByStatus,
+  searchPayments,
+} from '@/lib/transaction-filters'
 import { useAuthenticatedSession } from '@/components/session-provider'
 
 const EXPLORER_BASE = `https://stellar.expert/explorer/${
@@ -75,6 +80,10 @@ export default function TransactionsPage() {
   const [refundRecipient, setRefundRecipient] = useState('')
   const [refundReason, setRefundReason] = useState('')
   const [refundFormError, setRefundFormError] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<PaymentStatus | 'all'>('all')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -226,6 +235,51 @@ export default function TransactionsPage() {
         )}
       </header>
 
+      {payments.length > 0 && (
+        <div className="mt-6 grid gap-3 sm:grid-cols-4">
+          <div className="space-y-1 sm:col-span-2">
+            <Label htmlFor="transaction-search">Search</Label>
+            <DebouncedSearchInput onSearch={setSearchQuery} />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="transaction-status">Status</Label>
+            <select
+              id="transaction-status"
+              className="border-hairline bg-panel h-9 w-full rounded-md border px-2 text-sm"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as PaymentStatus | 'all')}
+            >
+              <option value="all">All</option>
+              {FILTERABLE_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {STATUS_LABEL[status]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label htmlFor="transaction-from">From</Label>
+              <Input
+                id="transaction-from"
+                type="date"
+                value={fromDate}
+                onChange={(event) => setFromDate(event.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="transaction-to">To</Label>
+              <Input
+                id="transaction-to"
+                type="date"
+                value={toDate}
+                onChange={(event) => setToDate(event.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {payments.length === 0 ? (
         <div className="mt-6 flex flex-col items-center gap-3 py-12 text-center">
           <EmptyStateIllustration variant="empty" className="size-20" />
@@ -235,7 +289,7 @@ export default function TransactionsPage() {
         </div>
       ) : (
         <ul className="border-hairline mt-6 divide-y">
-          {payments.map((payment) => (
+          {filteredPayments.map((payment) => (
             <li key={payment.id} className="flex items-center justify-between gap-3 py-3">
               <div className="min-w-0 space-y-1">
                 <p className="text-base font-bold tabular-nums text-white">

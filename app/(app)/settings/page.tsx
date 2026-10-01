@@ -25,6 +25,9 @@ import {
 import { api, ApiError, type Me } from '@/lib/api'
 import { useAuthenticatedSession, useSession } from '@/components/session-provider'
 
+/** RFC-5322-inspired regex that catches obviously malformed addresses client-side. */
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 function getInitials(name: string | null): string {
   if (!name) return '?'
   return name
@@ -54,6 +57,7 @@ export default function ProfilePage() {
   const [name, setName] = useState('')
   const [merchantName, setMerchantName] = useState('')
   const [newEmail, setNewEmail] = useState('')
+  const [emailFormatError, setEmailFormatError] = useState<string | null>(null)
   const [emailSent, setEmailSent] = useState(false)
 
   const load = useCallback(
@@ -66,6 +70,7 @@ export default function ProfilePage() {
         setName(data.name ?? '')
         setMerchantName(data.merchant_name ?? '')
         setNewEmail(data.email ?? '')
+        setEmailFormatError(null)
       } catch (cause) {
         if (cause instanceof DOMException && cause.name === 'AbortError') return
         if (cause instanceof ApiError && cause.status === 0) throw cause
@@ -109,8 +114,12 @@ export default function ProfilePage() {
         merchant_name: merchantName.trim() || undefined,
       })
       setMe((prev) => (prev ? { ...prev, ...updated } : prev))
-      await refreshMe()
-      showSuccess('Profile updated successfully.')
+      const result = await refreshMe()
+      if (result.success) {
+        showSuccess('Profile updated successfully.')
+      }
+      // Network errors are handled silently here - the UI already shows the
+      // updated local state, and the next render will retry.
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not update profile')
     } finally {
@@ -121,10 +130,18 @@ export default function ProfilePage() {
   async function sendEmailVerification(event: React.FormEvent) {
     event.preventDefault()
     const email = newEmail.trim()
+
     if (!email || email === me?.email) {
       setError('Enter a new email address to change it.')
       return
     }
+
+    if (!EMAIL_REGEX.test(email)) {
+      setEmailFormatError('Please enter a valid email address.')
+      return
+    }
+
+    setEmailFormatError(null)
     setSavingEmail(true)
     setError(null)
     try {
@@ -276,10 +293,18 @@ export default function ProfilePage() {
                 value={newEmail}
                 onChange={(e) => {
                   setNewEmail(e.target.value)
+                  setEmailFormatError(null)
                   setEmailSent(false)
                 }}
                 placeholder="you@example.com"
+                aria-describedby={emailFormatError ? 'email-format-error' : undefined}
+                aria-invalid={emailFormatError ? true : undefined}
               />
+              {emailFormatError && (
+                <p id="email-format-error" className="text-sm text-destructive" role="alert">
+                  {emailFormatError}
+                </p>
+              )}
               <p className="text-dim text-xs">
                 Changing your email requires verification. We will send a confirmation link to the
                 new address.

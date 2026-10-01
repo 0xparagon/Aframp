@@ -8,6 +8,7 @@ Thank you for your interest in contributing to AFRAMP! This guide will help you 
 - [Contributing via dev-frontend](#contributing-via-dev-frontend)
 - [Development Workflow](#development-workflow)
 - [Code Standards](#code-standards)
+- [Error Display Conventions](#error-display-conventions)
 - [Testing](#testing)
 - [Submitting Changes](#submitting-changes)
 - [CI/CD Pipeline](#cicd-pipeline)
@@ -293,6 +294,51 @@ components/
 
 ---
 
+## Error Display Conventions
+
+Error handling in the UI follows a single, documented convention so contributors don't have to guess which pattern to use. Pick the component based on **where** the error occurs, not personal preference.
+
+### `ErrorState` — full-page load failures
+
+Use [`ErrorState`](components/ui/error-state.tsx) when a **page-level data fetch fails** and the user has nothing meaningful to interact with until it succeeds. It renders a centered, full-page message and a **retry button** wired to `onRetry`.
+
+```tsx
+// ✅ Full-page load failure with retry
+if (error) {
+  return <ErrorState message={error} onRetry={refetch} />
+}
+```
+
+- Always pass `onRetry` so the user can recover without a full reload.
+- Use it for top-level page loads (e.g. `app/(app)/home/page.tsx`, `app/(app)/withdraw/page.tsx`).
+- Do **not** use it for errors that occur after the page has already rendered content.
+
+### `Alert` — inline form/action errors
+
+Use [`Alert`](components/ui/alert.tsx) with `variant="destructive"` for errors tied to a **specific form, field, or action** while the rest of the page stays usable.
+
+```tsx
+// ✅ Inline form/action error
+<Alert variant="destructive">
+  <AlertDescription>{error}</AlertDescription>
+</Alert>
+```
+
+- Place it next to the form or action that produced the error.
+- Use it for validation failures, failed submissions, and transient action errors.
+- Do **not** use it as a replacement for a full-page load failure.
+
+### Quick reference
+
+| Situation | Component |
+| --- | --- |
+| Page-level fetch failed, nothing to show | `ErrorState` (with `onRetry`) |
+| Form validation / submit / action failed | `Alert variant="destructive"` |
+
+When adding a new page, follow this convention rather than choosing arbitrarily. If you find an existing page that violates it, fix it as part of your change.
+
+---
+
 ## Testing
 
 ### Backend BigInt Fields
@@ -335,6 +381,19 @@ npm run test:watch
 # Coverage report
 npm run test:coverage
 ```
+
+### End-to-End Tests
+
+Install the Chromium browser once after installing npm dependencies, then run the Playwright suite:
+
+```bash
+npm ci
+npx playwright install chromium
+npm run test:e2e
+```
+
+The Playwright configuration starts the Next.js development server on port 3001. The E2E tests
+intercept backend requests so the login and payment-request flows do not require a running API.
 
 ### Coverage Requirements
 
@@ -508,44 +567,4 @@ git push origin feature/name --force-with-lease
 - ✅ Code follows style guide
 - ✅ Tests are comprehensive
 - ✅ No breaking changes
-- ✅ Documentation is clear
-- ✅ Performance is acceptable
-- ✅ Security best practices followed
-
-### Responding to Feedback
-
-1. Read feedback carefully
-2. Ask questions if unclear
-3. Make requested changes
-4. Push updates
-5. Mark conversations as resolved
-
----
-
-## Resources
-
-- [CI/CD Setup Guide](./CI-CD-SETUP.md)
-- [GitHub Actions Workflows](./.github/WORKFLOWS.md)
-- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
-- [React Documentation](https://react.dev/)
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Tailwind CSS](https://tailwindcss.com/docs)
-
----
-
-## Questions?
-
-- Check existing issues/discussions
-- Ask in PR comments
-- Contact team lead
-- Review documentation
-
----
-
-## Code of Conduct
-
-Please note that this project is released with a [Contributor Code of Conduct](./CODE_OF_CONDUCT.md). By participating in this project you agree to abide by its terms.
-
----
-
-Thank you for contributing to AFRAMP! 🚀
+- ✅ Documentation
