@@ -232,6 +232,20 @@ describe('api', () => {
     expect(fetchMock.mock.calls[0][1].headers).toEqual({ Authorization: 'Bearer tok' })
   })
 
+  it('getWallet GETs /wallet', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({}))
+    await api.getWallet('tok')
+    expect(fetchMock.mock.calls[0][0]).toBe('/backend/wallet')
+  })
+
+  it('getWallet forwards AbortSignal so in-flight requests can be cancelled', async () => {
+    const controller = new AbortController()
+    const abortError = new DOMException('The operation was aborted', 'AbortError')
+    fetchMock.mockRejectedValue(abortError)
+    await expect(api.getWallet('tok', controller.signal)).rejects.toBe(abortError)
+    expect(fetchMock.mock.calls[0][1].signal).toBe(controller.signal)
+  })
+
   it('createWallet posts an empty body', async () => {
     fetchMock.mockResolvedValue(jsonResponse({}))
     await api.createWallet('tok')
@@ -240,10 +254,12 @@ describe('api', () => {
     expect(fetchMock.mock.calls[0][1].body).toBe('{}')
   })
 
-  it('getWallet GETs /wallet', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({}))
-    await api.getWallet('tok')
-    expect(fetchMock.mock.calls[0][0]).toBe('/backend/wallet')
+  it('createWallet forwards AbortSignal so in-flight requests can be cancelled', async () => {
+    const controller = new AbortController()
+    const abortError = new DOMException('The operation was aborted', 'AbortError')
+    fetchMock.mockRejectedValue(abortError)
+    await expect(api.createWallet('tok', controller.signal)).rejects.toBe(abortError)
+    expect(fetchMock.mock.calls[0][1].signal).toBe(controller.signal)
   })
 
   it('getBalances GETs /balance', async () => {

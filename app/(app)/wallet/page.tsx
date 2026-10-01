@@ -49,11 +49,13 @@ export default function WalletPage() {
   }, [load])
 
   async function createWallet() {
+    const controller = new AbortController()
     setCreating(true)
     setError(null)
     try {
-      setWallet(await api.createWallet(token))
+      setWallet(await api.createWallet(token, controller.signal))
     } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
       setError(cause instanceof Error ? cause.message : 'Could not set up your address')
     } finally {
       setCreating(false)

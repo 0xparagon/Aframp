@@ -449,8 +449,8 @@ export const api = {
   /** The JWT carries only ids; this is how anything human-readable is rendered. */
   getMe: (token: string, signal?: AbortSignal) => request<Me>('/me', { token, signal }),
 
-  createWallet: (token: string) =>
-    request<Wallet>('/wallet/create', { method: 'POST', body: {}, token }),
+  createWallet: (token: string, signal?: AbortSignal) =>
+    request<Wallet>('/wallet/create', { method: 'POST', body: {}, token, signal }),
 
   getWallet: (token: string, signal?: AbortSignal) => request<Wallet>('/wallet', { token, signal }),
 
