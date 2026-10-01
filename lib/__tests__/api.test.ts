@@ -1,6 +1,7 @@
 import {
   ApiError,
   api,
+  isOffline,
   parseWithBigInts,
   request,
   setUnauthorizedHandler,
@@ -99,6 +100,19 @@ describe('ApiError', () => {
   })
 })
 
+describe('isOffline', () => {
+  it('returns true for ApiError with status 0', () => {
+    expect(isOffline(new ApiError('network failed', 0))).toBe(true)
+  })
+
+  it('returns false for other status codes or error types', () => {
+    expect(isOffline(new ApiError('bad request', 400))).toBe(false)
+    expect(isOffline(new Error('general error'))).toBe(false)
+    expect(isOffline(null)).toBe(false)
+    expect(isOffline('string')).toBe(false)
+  })
+})
+
 describe('request', () => {
   it('parses a JSON success body and revives bigints', async () => {
     fetchMock.mockResolvedValue(
@@ -187,7 +201,9 @@ describe('api', () => {
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('/backend/signup')
     expect(init.method).toBe('POST')
-    expect(init.body).toBe('{"email":"a@b.c","password":"pw","name":"Name","phone_number":"08011122233"}')
+    expect(init.body).toBe(
+      '{"email":"a@b.c","password":"pw","name":"Name","phone_number":"08011122233"}'
+    )
     expect(result).toEqual({ challenge_id: 'chal-1', expires_in_secs: 600 })
   })
 
@@ -322,5 +338,192 @@ describe('api', () => {
     fetchMock.mockResolvedValue(jsonResponse([]))
     await api.listWithdrawals('tok')
     expect(fetchMock.mock.calls[0][0]).toBe('/backend/withdrawals?limit=50')
+  })
+
+  it('createRefund posts refund request with body', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({}))
+    await api.createRefund('tok', 'pay-1', 100n, 'GDEST123', 'Customer request')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/backend/payments/pay-1/refund')
+    expect(init.method).toBe('POST')
+    expect(init.headers).toEqual({
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer tok',
+    })
+    expect(init.body).toBe(
+      '{"amount_stroops":100,"recipient":"GDEST123","reason":"Customer request"}'
+    )
+  })
+
+  it('listRefunds GETs /refunds with limit', async () => {
+    fetchMock.mockResolvedValue(jsonResponse([]))
+    await api.listRefunds('tok', 25)
+    expect(fetchMock.mock.calls[0][0]).toBe('/backend/refunds?limit=25')
+  })
+
+  it('listApiKeys GETs /api-keys', async () => {
+    fetchMock.mockResolvedValue(jsonResponse([]))
+    await api.listApiKeys('tok')
+    expect(fetchMock.mock.calls[0][0]).toBe('/backend/api-keys')
+  })
+
+  it('createApiKey posts name to /api-keys', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({}))
+    await api.createApiKey('tok', 'My Key')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/backend/api-keys')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBe('{"name":"My Key"}')
+  })
+
+  it('revokeApiKey sends DELETE to /api-keys/:id', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
+    await api.revokeApiKey('tok', 'key-uuid-1')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/backend/api-keys/key-uuid-1')
+    expect(init.method).toBe('DELETE')
+  })
+
+  it('updateProfile posts to /me', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({}))
+    await api.updateProfile('tok', { name: 'Alice', merchant_name: 'Alice Store' })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/backend/me')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBe('{"name":"Alice","merchant_name":"Alice Store"}')
+  })
+
+  it('changeEmail posts new_email to /me/email', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ message: 'verification sent' }))
+    await api.changeEmail('tok', 'new@example.com')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/backend/me/email')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBe('{"new_email":"new@example.com"}')
+  })
+
+  it('deleteAccount sends DELETE to /me', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ message: 'account deleted' }))
+    await api.deleteAccount('tok')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/backend/me')
+    expect(init.method).toBe('DELETE')
+  })
+
+  it('registerPushSubscription posts subscription to /push/subscribe', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({}))
+    await api.registerPushSubscription('tok', {
+      endpoint: 'https://push.example.com',
+      p256dh: 'p256',
+      auth: 'authKey',
+    })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/backend/push/subscribe')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBe(
+      '{"endpoint":"https://push.example.com","p256dh":"p256","auth":"authKey"}'
+    )
+  })
+
+  it('unregisterPushSubscription sends DELETE to /push/unsubscribe', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
+    await api.unregisterPushSubscription('tok')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/backend/push/unsubscribe')
+    expect(init.method).toBe('DELETE')
+  })
+
+  it('getPushSubscriptionStatus GETs /push/status', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ enabled: true }))
+    const res = await api.getPushSubscriptionStatus('tok')
+    expect(fetchMock.mock.calls[0][0]).toBe('/backend/push/status')
+    expect(res).toEqual({ enabled: true })
+  })
+
+  it('getRemittanceFeeEstimate GETs /remittance/estimate with query params', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ fee_stroops: 10, network_fee_stroops: 1, total_stroops: 11 })
+    )
+    await api.getRemittanceFeeEstimate('tok', 500n, 'XLM')
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/backend/remittance/estimate?amount_stroops=500&asset=XLM'
+    )
+  })
+
+  it('createRemittance posts to /remittance', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({}))
+    await api.createRemittance('tok', 'GDEST123', 500n, 'XLM', 'Invoice #12')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/backend/remittance')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBe(
+      '{"destination_address":"GDEST123","amount_stroops":500,"asset":"XLM","memo":"Invoice #12"}'
+    )
+  })
+
+  it('listRemittances GETs /remittances with limit', async () => {
+    fetchMock.mockResolvedValue(jsonResponse([]))
+    await api.listRemittances('tok', 30)
+    expect(fetchMock.mock.calls[0][0]).toBe('/backend/remittances?limit=30')
+  })
+
+  it('createOzowPayment posts initiate details', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ payment_url: 'https://ozow.test', transaction_id: 'tx-1' })
+    )
+    await api.createOzowPayment('tok', 150, 'ABSA', 'https://return.test')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/backend/onramp/ozow/initiate')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBe('{"amount":150,"bank_code":"ABSA","return_url":"https://return.test"}')
+  })
+
+  it('verifyOzowPayment GETs /onramp/ozow/verify/:id', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ status: 'completed' }))
+    const res = await api.verifyOzowPayment('tok', 'tx-1')
+    expect(fetchMock.mock.calls[0][0]).toBe('/backend/onramp/ozow/verify/tx-1')
+    expect(res).toEqual({ status: 'completed' })
+  })
+
+  it('adminOverview GETs /admin/overview', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ total_users: 10 }))
+    await api.adminOverview('tok')
+    expect(fetchMock.mock.calls[0][0]).toBe('/backend/admin/overview')
+  })
+
+  it('adminUsers GETs /admin/users with limit', async () => {
+    fetchMock.mockResolvedValue(jsonResponse([]))
+    await api.adminUsers('tok', 50)
+    expect(fetchMock.mock.calls[0][0]).toBe('/backend/admin/users?limit=50')
+  })
+
+  it('adminMerchants GETs /admin/merchants with limit', async () => {
+    fetchMock.mockResolvedValue(jsonResponse([]))
+    await api.adminMerchants('tok', 50)
+    expect(fetchMock.mock.calls[0][0]).toBe('/backend/admin/merchants?limit=50')
+  })
+
+  it('adminWallets GETs /admin/wallets with limit', async () => {
+    fetchMock.mockResolvedValue(jsonResponse([]))
+    await api.adminWallets('tok', 50)
+    expect(fetchMock.mock.calls[0][0]).toBe('/backend/admin/wallets?limit=50')
+  })
+
+  it('adminTransactions GETs /admin/transactions with limit', async () => {
+    fetchMock.mockResolvedValue(jsonResponse([]))
+    await api.adminTransactions('tok', 50)
+    expect(fetchMock.mock.calls[0][0]).toBe('/backend/admin/transactions?limit=50')
+  })
+
+  it('adminWithdrawals GETs /admin/withdrawals with limit', async () => {
+    fetchMock.mockResolvedValue(jsonResponse([]))
+    await api.adminWithdrawals('tok', 50)
+    expect(fetchMock.mock.calls[0][0]).toBe('/backend/admin/withdrawals?limit=50')
+  })
+
+  it('adminPaymentRequests GETs /admin/payment-requests with limit', async () => {
+    fetchMock.mockResolvedValue(jsonResponse([]))
+    await api.adminPaymentRequests('tok', 50)
+    expect(fetchMock.mock.calls[0][0]).toBe('/backend/admin/payment-requests?limit=50')
   })
 })
