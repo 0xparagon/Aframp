@@ -100,6 +100,9 @@ export default function WithdrawPage() {
     if (accountNumber.length !== config.accountNumberLength) {
       return `Account numbers are ${config.accountNumberLength} digits.`
     }
+    if (!/^\d+$/.test(accountNumber)) {
+      return 'Account number must contain digits only.'
+    }
     return null
   }
 

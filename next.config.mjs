@@ -49,23 +49,15 @@ const nextConfig = {
     ]
   },
   headers() {
-    const csp = [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https:",
-      "font-src 'self' data:",
-      "connect-src 'self' https://api.coingecko.com https://horizon.stellar.org https://horizon-testnet.stellar.org https://*.sentry.io https://*.ingest.us.sentry.io https://vitals.vercel-insights.com",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-    ].join('; ')
-
+    // NOTE: The Content-Security-Policy header with per-request nonce is now
+    // set by middleware.ts (#632). The static-file entries below apply only to
+    // assets that bypass middleware (e.g. _next/static) and therefore do NOT
+    // include script-src so they don't clobber the nonce injected by the
+    // middleware on page routes.
     return [
       {
         source: '/(.*)',
         headers: [
-          { key: 'Content-Security-Policy', value: csp },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'X-XSS-Protection', value: '1; mode=block' },

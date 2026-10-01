@@ -47,8 +47,23 @@ export function ZarOnramp({ token }: ZarOnrampProps) {
         returnUrl
       )
 
+      // Validate the URL before redirecting: must be https:// and on the
+      // expected Ozow domain to prevent open-redirect / javascript: attacks.
+      let parsedUrl: URL
+      try {
+        parsedUrl = new URL(payment_url)
+      } catch {
+        throw new Error('Invalid payment URL received from server.')
+      }
+      if (
+        parsedUrl.protocol !== 'https:' ||
+        !parsedUrl.hostname.endsWith('ozow.com')
+      ) {
+        throw new Error('Payment URL failed security validation. Please contact support.')
+      }
+
       // Redirect to Ozow payment page
-      window.location.href = payment_url
+      window.location.href = parsedUrl.href
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to initiate payment')
       setIsProcessing(false)
