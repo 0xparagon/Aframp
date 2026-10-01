@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useSession } from '@/components/session-provider'
 import { isOffline } from '@/lib/api'
+import { CHALLENGE_SESSION_KEY } from '@/app/login/page'
 
 const MIN_PASSWORD_LENGTH = 8
 
@@ -49,7 +50,9 @@ export default function SignupPage() {
     setSubmitting(true)
     try {
       const challenge = await signUp(email.trim(), password, name.trim(), phone.trim())
-      router.push(`/verify?challenge_id=${challenge.challenge_id}&flow=signup`)
+      // #638: store challenge_id in sessionStorage instead of the URL
+      sessionStorage.setItem(CHALLENGE_SESSION_KEY, challenge.challenge_id)
+      router.push('/verify?flow=signup')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not create your account')
       setOffline(isOffline(cause))

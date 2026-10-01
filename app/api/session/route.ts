@@ -16,9 +16,24 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json() as { token: string; userId: string; merchantId: string | null }
+  const body = (await request.json()) as {
+    token?: string
+    userId?: string
+    merchantId?: string | null
+  }
+
+  if (!body.token || !body.userId) {
+    return NextResponse.json({ error: 'token and userId are required' }, { status: 400 })
+  }
+
+  const payload = JSON.stringify({
+    token: body.token,
+    userId: body.userId,
+    merchantId: body.merchantId ?? null,
+  })
+
   const cookieStore = await cookies()
-  cookieStore.set(COOKIE_NAME, JSON.stringify(body), {
+  cookieStore.set(COOKIE_NAME, payload, {
     httpOnly: true,
     sameSite: 'strict',
     secure: process.env.NODE_ENV === 'production',

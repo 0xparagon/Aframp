@@ -1,8 +1,9 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import LoginPage from './page'
+import LoginPage, { CHALLENGE_SESSION_KEY } from './page'
 import { useSession } from '@/components/session-provider'
 import { useRouter } from 'next/navigation'
+import { ApiError } from '@/lib/api'
 
 jest.mock('@/components/session-provider', () => ({
   useSession: jest.fn(),
@@ -21,6 +22,7 @@ describe('LoginPage', () => {
     replace.mockReset()
     push.mockReset()
     signIn.mockReset()
+    sessionStorage.clear()
     ;(useRouter as jest.Mock).mockReturnValue({ replace, push })
     ;(useSession as jest.Mock).mockReturnValue({
       session: null,
@@ -61,7 +63,7 @@ describe('LoginPage', () => {
     expect(push).not.toHaveBeenCalled()
   })
 
-  it('routes to /verify when the password check returns an OTP challenge', async () => {
+  it('stores challenge_id in sessionStorage and routes to /verify without it in the URL', async () => {
     const user = userEvent.setup()
     signIn.mockResolvedValue({ challenge_id: 'chal-123', expires_in_secs: 600 })
     render(<LoginPage />)
@@ -70,7 +72,10 @@ describe('LoginPage', () => {
     await user.type(screen.getByLabelText(/password/i), 'secret-pass')
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
-    expect(push).toHaveBeenCalledWith('/verify?challenge_id=chal-123&flow=login')
+    // challenge_id must be in sessionStorage, NOT in the URL
+    expect(sessionStorage.getItem(CHALLENGE_SESSION_KEY)).toBe('chal-123')
+    expect(push).toHaveBeenCalledWith('/verify?flow=login')
+    expect(push).not.toHaveBeenCalledWith(expect.stringContaining('challenge_id'))
     expect(replace).not.toHaveBeenCalledWith('/home')
   })
 
@@ -84,5 +89,30 @@ describe('LoginPage', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
     expect(await screen.findByText('Invalid credentials')).toBeInTheDocument()
+  })
+
+  it('shows a rate-limit message with retry guidance on a 429 response', async () => {
+    const user = userEvent.setup()
+    signIn.mockRejectedValue(new ApiError('rate limited', 429))
+    render(<LoginPage />)
+
+    await user.type(screen.getByLabelText(/email/i), 'merchant@example.com')
+    await user.type(screen.getByLabelText(/password/i), 'wrong-pass')
+    await user.click(screen.getByRole('button', { name: /sign in/i }))
+
+    expect(await screen.findByText(/too many sign-in attempts/i)).toBeInTheDocument()
+    expect(screen.getByText(/too many sign-in attempts/i)).toBeInTheDocument()
+  })
+
+  it('parses the retry-after seconds from the error code on a 429', async () => {
+    const user = userEvent.setup()
+    signIn.mockRejectedValue(new ApiError('rate limited', 429, 'RETRY_AFTER_60'))
+    render(<LoginPage />)
+
+    await user.type(screen.getByLabelText(/email/i), 'merchant@example.com')
+    await user.type(screen.getByLabelText(/password/i), 'wrong-pass')
+    await user.click(screen.getByRole('button', { name: /sign in/i }))
+
+    expect(await screen.findByText(/60 seconds/i)).toBeInTheDocument()
   })
 })
