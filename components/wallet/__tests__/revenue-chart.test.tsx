@@ -1,6 +1,8 @@
 import { render, screen, within } from '@testing-library/react'
+import { act, useState } from 'react'
 import { RevenueChart } from '@/components/wallet/revenue-chart'
 import type { Payment } from '@/lib/api'
+import * as revenueModule from '@/lib/revenue'
 
 function payment(overrides: Partial<Payment>): Payment {
   return {
@@ -52,5 +54,51 @@ describe('RevenueChart', () => {
     expect(
       screen.getByText('Total confirmed payments per day for the last 7 days')
     ).toBeInTheDocument()
+  })
+
+  it('memoizes expensive calculations and does not recalculate when unrelated state changes', () => {
+    const buildDailyRevenueSpy = jest.spyOn(revenueModule, 'buildDailyRevenue')
+    const assetsInSeriesSpy = jest.spyOn(revenueModule, 'assetsInSeries')
+
+    const testPayments = [
+      payment({ asset: 'XLM', amount_stroops: 10_000_000n }),
+      payment({ asset: 'cNGN', amount_stroops: 50_000_000n }),
+    ]
+
+    // Test component that can trigger unrelated state changes
+    function TestWrapper() {
+      const [unrelatedState, setUnrelatedState] = useState(false)
+      return (
+        <div>
+          <RevenueChart payments={testPayments} />
+          <button onClick={() => setUnrelatedState(!unrelatedState)}>
+            Toggle: {unrelatedState.toString()}
+          </button>
+        </div>
+      )
+    }
+
+    const { getByRole } = render(<TestWrapper />)
+
+    // Initial render should call the functions once
+    expect(buildDailyRevenueSpy).toHaveBeenCalledTimes(1)
+    expect(assetsInSeriesSpy).toHaveBeenCalledTimes(1)
+
+    // Reset call counts
+    buildDailyRevenueSpy.mockClear()
+    assetsInSeriesSpy.mockClear()
+
+    // Trigger unrelated state change
+    act(() => {
+      getByRole('button').click()
+    })
+
+    // Functions should not be called again since payments didn't change
+    expect(buildDailyRevenueSpy).not.toHaveBeenCalled()
+    expect(assetsInSeriesSpy).not.toHaveBeenCalled()
+
+    // Cleanup
+    buildDailyRevenueSpy.mockRestore()
+    assetsInSeriesSpy.mockRestore()
   })
 })

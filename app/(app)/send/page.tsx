@@ -40,6 +40,7 @@ interface SendState {
   error: string | null
   feeEstimate: FeeEstimate | null
   loadingFee: boolean
+  feeError: boolean
   submitting: boolean
   remittances: Remittance[]
   showContacts: boolean
@@ -65,6 +66,7 @@ export default function SendPage() {
     error: null,
     feeEstimate: null,
     loadingFee: false,
+    feeError: false,
     submitting: false,
     remittances: [],
     showContacts: false,
@@ -116,17 +118,19 @@ export default function SendPage() {
   useEffect(() => {
     const stroops = parseAmountToStroops(state.amount)
     if (stroops === null || stroops <= 0n) {
-      setState((prev) => ({ ...prev, feeEstimate: null }))
+      setState((prev) => ({ ...prev, feeEstimate: null, feeError: false }))
       return
     }
 
     const loadFee = async () => {
-      setState((prev) => ({ ...prev, loadingFee: true }))
+      setState((prev) => ({ ...prev, loadingFee: true, feeError: false }))
       try {
         const estimate = await api.getRemittanceFeeEstimate(token, stroops, state.asset)
         setState((prev) => ({ ...prev, feeEstimate: estimate, loadingFee: false }))
       } catch {
-        setState((prev) => ({ ...prev, feeEstimate: null, loadingFee: false }))
+        // A failed estimate must never block the send: fall back to the plain
+        // amount and let the user know the fee could not be fetched (#708).
+        setState((prev) => ({ ...prev, feeEstimate: null, loadingFee: false, feeError: true }))
       }
     }
 
@@ -169,6 +173,7 @@ export default function SendPage() {
         amount: '',
         memo: '',
         feeEstimate: null,
+        feeError: false,
         error: null,
       }))
       await load()
@@ -337,6 +342,13 @@ export default function SendPage() {
             <p className="text-dim text-xs flex items-center gap-2">
               <LoadingSpinner className="size-3" />
               Calculating fee estimate...
+            </p>
+          )}
+
+          {state.feeError && stroops && stroops > 0n && (
+            <p role="status" className="text-warning text-xs">
+              Fee estimate unavailable. You can still send; the exact fee is applied when the
+              payment is submitted.
             </p>
           )}
 

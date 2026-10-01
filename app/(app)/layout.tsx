@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { WalletSidebar } from '@/components/wallet/wallet-sidebar'
 import { useSession } from '@/components/session-provider'
@@ -11,9 +11,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { session, ready } = useSession()
   const router = useRouter()
   const [scopeNode, setScopeNode] = useState<HTMLDivElement | null>(null)
+  const redirectRef = useRef(false)
 
   useEffect(() => {
-    if (ready && !session) router.replace('/login')
+    if (!ready || session || redirectRef.current) return
+    redirectRef.current = true
+    router.replace('/login')
   }, [ready, session, router])
 
   // Children below assume a session exists; don't mount them until it does.

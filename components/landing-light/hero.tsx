@@ -30,12 +30,14 @@ export function Hero() {
         {/* Lifted from the design export — the render sits on the same
             brand green, so its transparent edges blend exactly. */}
         <Image
-          src="/landing/hero-coins.png"
+          src="/landing/hero-coins.webp"
           alt=""
           aria-hidden="true"
           width={705}
           height={835}
           priority
+          sizes="(max-width: 1024px) 100vw, 460px"
+          decoding="async"
           className="hidden h-auto w-full max-w-[460px] justify-self-end lg:block"
         />
       </div>
