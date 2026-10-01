@@ -5,8 +5,8 @@ Thank you for your interest in contributing to AFRAMP! This guide will help you 
 ## Table of Contents
 
 - [Getting Started](#getting-started)
-- [Development Workflow](#development-workflow)
 - [Contributing via dev-frontend](#contributing-via-dev-frontend)
+- [Development Workflow](#development-workflow)
 - [Code Standards](#code-standards)
 - [Testing](#testing)
 - [Submitting Changes](#submitting-changes)
@@ -166,17 +166,17 @@ See [`dev-frontend/README.md`](dev-frontend/README.md) for full setup instructio
 
 The following paths are the production codebase and **must not be modified** from the `dev-frontend` branch:
 
-| Protected path | Contents |
-|----------------|----------|
-| `app/` | Next.js routes and pages |
-| `components/` | Shared UI components |
-| `lib/` | Core libraries and utilities |
-| `hooks/` | Shared React hooks |
-| `styles/` | Global styles |
-| `public/` | Static assets |
-| `types/` | Shared TypeScript types |
-| `next.config.mjs` | Next.js configuration |
-| `next-env.d.ts` | Next.js type declarations |
+| Protected path    | Contents                     |
+| ----------------- | ---------------------------- |
+| `app/`            | Next.js routes and pages     |
+| `components/`     | Shared UI components         |
+| `lib/`            | Core libraries and utilities |
+| `hooks/`          | Shared React hooks           |
+| `styles/`         | Global styles                |
+| `public/`         | Static assets                |
+| `types/`          | Shared TypeScript types      |
+| `next.config.mjs` | Next.js configuration        |
+| `next-env.d.ts`   | Next.js type declarations    |
 
 ### Guard CI
 
