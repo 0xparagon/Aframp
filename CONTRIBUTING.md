@@ -5,6 +5,7 @@ Thank you for your interest in contributing to AFRAMP! This guide will help you 
 ## Table of Contents
 
 - [Getting Started](#getting-started)
+- [Frontend vs backend](#frontend-vs-backend)
 - [Contributing via dev-frontend](#contributing-via-dev-frontend)
 - [Development Workflow](#development-workflow)
 - [Code Standards](#code-standards)
@@ -150,6 +151,18 @@ git push origin feature/your-feature-name
 3. Select your branch
 4. Fill in PR template
 5. Submit for review
+
+---
+
+## Frontend vs backend
+
+This repository is the **merchant frontend only**. The API, database and all business logic live in [`kellymusk/aframp-backend`](https://github.com/kellymusk/aframp-backend).
+
+- **Don't build backend features here.** No new API routes, database code, migrations or ORM/database packages. The only server routes this repo owns are `app/api/session` (session cookie bridge) and `app/api/banks` (cached bank list).
+- **The frontend calls the backend through the `/backend` proxy** configured in `next.config.mjs` (see [`docs/adr-001-backend-proxy.md`](docs/adr-001-backend-proxy.md)), using `lib/api/*`.
+- **The API contract is the backend's `openapi.yaml`.** If a feature needs an endpoint that doesn't exist, open an issue in `kellymusk/aframp-backend` and label the frontend issue `blocked: backend` until it ships.
+
+The [`No Backend Guard`](.github/workflows/no-backend-guard.yml) check fails any PR that adds API routes, database/server code or database dependencies to this repo.
 
 ---
 

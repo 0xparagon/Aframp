@@ -1,0 +1,76 @@
+name: No Backend Guard
+
+# This repo is the merchant frontend. All server-side business logic, data
+# storage and API endpoints live in kellymusk/aframp-backend, and the frontend
+# reaches them only through the `/backend` proxy in next.config.mjs.
+#
+# This guard fails a PR that adds backend code here:
+#   - new route handlers under app/api/ (only the existing session cookie and
+#     bank-list routes are allowed)
+#   - database / migration / ORM code
+#   - database or ORM driver dependencies in package.json
+#
+# If you need a new endpoint, open an issue in kellymusk/aframp-backend and
+# add it to that repo's openapi.yaml; this repo then calls it via /backend.
+
+on:
+  pull_request:
+    branches:
+      - main
+      - dev
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: 'Guard — no backend code in the frontend'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect backend code
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          ADDED=$(git diff --name-only --diff-filter=A "$BASE_SHA" "$HEAD_SHA")
+          VIOLATIONS=""
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            case "$file" in
+              # The only server routes this frontend owns: the session cookie
+              # bridge and the cached bank list for the cash-out form.
+              app/api/session/*|app/api/banks/*) ;;
+              app/api/*|pages/api/*)
+                VIOLATIONS+="  - $file (new API route)"$'\n' ;;
+              migrations/*|*/migrations/*|prisma/*|drizzle/*|*.sql|server/*|lib/db/*|lib/server/*)
+                VIOLATIONS+="  - $file (database / server code)"$'\n' ;;
+            esac
+          done <<< "$ADDED"
+
+          # Database or ORM drivers added to package.json.
+          DB_PACKAGES='"(pg|postgres|mysql2?|mongodb|mongoose|sqlite3|better-sqlite3|prisma|@prisma/client|drizzle-orm|knex|sequelize|typeorm|redis|ioredis)"[[:space:]]*:'
+          NEW_DB=$(git diff "$BASE_SHA" "$HEAD_SHA" -- package.json | grep -E "^\+[[:space:]]*$DB_PACKAGES" || true)
+          if [ -n "$NEW_DB" ]; then
+            VIOLATIONS+="  - package.json adds a database/ORM dependency:"$'\n'"$NEW_DB"$'\n'
+          fi
+
+          if [ -n "$VIOLATIONS" ]; then
+            echo "::error::This PR adds backend code to the frontend repo."
+            echo ""
+            echo "$VIOLATIONS"
+            echo "Server-side logic, data and API endpoints belong in kellymusk/aframp-backend."
+            echo "Open an issue there, add the endpoint to its openapi.yaml, and call it from"
+            echo "this repo through the /backend proxy."
+            exit 1
+          fi
+
+          echo "No backend code added."
