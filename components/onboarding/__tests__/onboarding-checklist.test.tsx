@@ -18,7 +18,7 @@ describe('OnboardingChecklist', () => {
   })
 
   it('hides the checklist when the wallet has already been created', () => {
-    window.sessionStorage.setItem('walletAddress', 'GAXYZABC123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789ABCDEFG')
+    window.localStorage.setItem('walletAddress', 'GAXYZABC123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789ABCDEFG')
 
     render(<OnboardingChecklist />)
 

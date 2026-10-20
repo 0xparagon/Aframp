@@ -9,7 +9,6 @@ import { BalanceFigure } from '@/components/wallet/balance-figure'
 import { QuickActions } from '@/components/wallet/quick-actions'
 import { QuickConvert } from '@/components/wallet/quick-convert'
 import { RevenueChart } from '@/components/wallet/revenue-chart'
-import { TopAssets } from '@/components/wallet/top-assets'
 import { ErrorState } from '@/components/ui/error-state'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { OnboardingChecklist } from '@/components/onboarding/onboarding-checklist'
@@ -101,10 +100,6 @@ export default function HomePage() {
 
           <div className="mt-6">
             <QuickActions />
-          </div>
-
-          <div className="mt-6">
-            <TopAssets balances={balances} />
           </div>
         </section>
 

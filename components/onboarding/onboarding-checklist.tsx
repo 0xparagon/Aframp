@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { ArrowRight, CheckCircle2, Circle } from 'lucide-react'
-import { walletSession } from '@/lib/wallet/session'
 
 type StepKey = 'wallet' | 'charge' | 'payment' | 'cashout'
 
@@ -52,7 +51,7 @@ export function OnboardingChecklist() {
 
   useEffect(() => {
     const nextChecklist = readChecklist()
-    const walletAddress = walletSession.getAddress() || window.localStorage.getItem('walletAddress') || ''
+    const walletAddress = window.localStorage.getItem('walletAddress') || ''
 
     setChecklist(nextChecklist)
     setHasWallet(Boolean(walletAddress))
