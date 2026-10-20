@@ -126,15 +126,25 @@ the app actually hits them.
 
 ### 4. Uptime Monitor (`uptime-monitor.yml`)
 
-**Trigger:** Scheduled (configurable interval)
+**Trigger:** Every 5 minutes (cron) and manual (`workflow_dispatch`)
 
 **Purpose:** Monitors production deployment health
 
-**Checks:**
+**Checks** (each must return HTTP 200 within 10 seconds):
 
-- API endpoint availability
-- Response time monitoring
-- Error rate tracking
+- Homepage (`/`)
+- Login page (`/login`)
+- Wallet dashboard (`/wallet`)
+
+**Alerting:**
+
+- A run with any endpoint down fails, so GitHub sends a failed-workflow notification.
+- Three consecutive failing runs open a `🚨 AFRAMP production uptime alert` issue; the first healthy run closes it.
+- The failure count is kept in the Actions cache under `uptime-monitor-state-<run_id>-<run_attempt>`.
+
+**Monitored URL:** `https://app.aframp.com` by default. Set the `PRODUCTION_URL` repository variable (Settings → Secrets and variables → Actions → Variables, no trailing slash) to monitor another origin, such as the Vercel production URL, without a code change.
+
+**Prerequisite:** The monitored domain must resolve to the production deployment. For `app.aframp.com` that means adding it under the Vercel project's Domains and creating the DNS record Vercel asks for (see the `aframp.com` DNS provider). If the domain does not resolve, every run fails.
 
 ---
 
