@@ -5,8 +5,11 @@ Thank you for your interest in contributing to AFRAMP! This guide will help you 
 ## Table of Contents
 
 - [Getting Started](#getting-started)
+- [Frontend vs backend](#frontend-vs-backend)
+- [Contributing via dev-frontend](#contributing-via-dev-frontend)
 - [Development Workflow](#development-workflow)
 - [Code Standards](#code-standards)
+- [Error Display Conventions](#error-display-conventions)
 - [Testing](#testing)
 - [Submitting Changes](#submitting-changes)
 - [CI/CD Pipeline](#cicd-pipeline)
@@ -151,6 +154,64 @@ git push origin feature/your-feature-name
 
 ---
 
+## Frontend vs backend
+
+This repository is the **merchant frontend only**. The API, database and all business logic live in [`kellymusk/aframp-backend`](https://github.com/kellymusk/aframp-backend).
+
+- **Don't build backend features here.** No new API routes, database code, migrations or ORM/database packages. The only server routes this repo owns are `app/api/session` (session cookie bridge) and `app/api/banks` (cached bank list).
+- **The frontend calls the backend through the `/backend` proxy** configured in `next.config.mjs` (see [`docs/adr-001-backend-proxy.md`](docs/adr-001-backend-proxy.md)), using `lib/api/*`.
+- **The API contract is the backend's `openapi.yaml`.** If a feature needs an endpoint that doesn't exist, open an issue in `kellymusk/aframp-backend` and label the frontend issue `blocked: backend` until it ships.
+
+The [`No Backend Guard`](.github/workflows/no-backend-guard.yml) check fails any PR that adds API routes, database/server code or database dependencies to this repo.
+
+---
+
+## Contributing via dev-frontend
+
+If you want to build or experiment with frontend features **without touching the production frontend**, use the `dev-frontend` branch. It is a sandboxed workflow designed to prevent accidental changes to production files.
+
+### The sandbox directory
+
+All work on this branch lives inside the [`dev-frontend/`](dev-frontend/) directory. Create your own feature folder there (e.g. `dev-frontend/my-feature/`) for new components, pages, hooks, tests, and docs. You may read the main frontend code for reference, but must not edit it.
+
+See [`dev-frontend/README.md`](dev-frontend/README.md) for full setup instructions and rules.
+
+### Protected paths
+
+The following paths are the production codebase and **must not be modified** from the `dev-frontend` branch:
+
+| Protected path    | Contents                     |
+| ----------------- | ---------------------------- |
+| `app/`            | Next.js routes and pages     |
+| `components/`     | Shared UI components         |
+| `lib/`            | Core libraries and utilities |
+| `hooks/`          | Shared React hooks           |
+| `styles/`         | Global styles                |
+| `public/`         | Static assets                |
+| `types/`          | Shared TypeScript types      |
+| `next.config.mjs` | Next.js configuration        |
+| `next-env.d.ts`   | Next.js type declarations    |
+
+### Guard CI
+
+The workflow [`.github/workflows/dev-frontend-guard.yml`](.github/workflows/dev-frontend-guard.yml) runs on every push to, and every pull request targeting, `dev-frontend`. It diffs the changed files and **fails the check** if any file matches a protected path, listing the offending files in the job output. If it fails, revert those changes (e.g. `git checkout upstream/dev-frontend -- <file>`) and move your work into `dev-frontend/`.
+
+Once reviewed and approved, a maintainer will merge or cherry-pick sandbox work into `main` with full test coverage.
+
+### Quick-start checklist
+
+- [ ] Fork the repo and clone your fork
+- [ ] Add the upstream remote: `git remote add upstream https://github.com/kellymusk/Aframp.git`
+- [ ] Branch from `dev-frontend`: `git fetch upstream && git checkout -b feat/my-feature upstream/dev-frontend`
+- [ ] Read [`dev-frontend/README.md`](dev-frontend/README.md)
+- [ ] Create your feature folder: `mkdir dev-frontend/my-feature`
+- [ ] Keep all changes inside `dev-frontend/` (check with `git diff --name-only upstream/dev-frontend`)
+- [ ] Use [conventional commits](#3-commit-changes)
+- [ ] Open your PR against the **`dev-frontend`** branch (not `main`)
+- [ ] Confirm the **Dev-Frontend Guard** check passes
+
+---
+
 ## Code Standards
 
 ### TypeScript
@@ -246,7 +307,56 @@ components/
 
 ---
 
+## Error Display Conventions
+
+Error handling in the UI follows a single, documented convention so contributors don't have to guess which pattern to use. Pick the component based on **where** the error occurs, not personal preference.
+
+### `ErrorState` — full-page load failures
+
+Use [`ErrorState`](components/ui/error-state.tsx) when a **page-level data fetch fails** and the user has nothing meaningful to interact with until it succeeds. It renders a centered, full-page message and a **retry button** wired to `onRetry`.
+
+```tsx
+// ✅ Full-page load failure with retry
+if (error) {
+  return <ErrorState message={error} onRetry={refetch} />
+}
+```
+
+- Always pass `onRetry` so the user can recover without a full reload.
+- Use it for top-level page loads (e.g. `app/(app)/home/page.tsx`, `app/(app)/withdraw/page.tsx`).
+- Do **not** use it for errors that occur after the page has already rendered content.
+
+### `Alert` — inline form/action errors
+
+Use [`Alert`](components/ui/alert.tsx) with `variant="destructive"` for errors tied to a **specific form, field, or action** while the rest of the page stays usable.
+
+```tsx
+// ✅ Inline form/action error
+<Alert variant="destructive">
+  <AlertDescription>{error}</AlertDescription>
+</Alert>
+```
+
+- Place it next to the form or action that produced the error.
+- Use it for validation failures, failed submissions, and transient action errors.
+- Do **not** use it as a replacement for a full-page load failure.
+
+### Quick reference
+
+| Situation                                | Component                     |
+| ---------------------------------------- | ----------------------------- |
+| Page-level fetch failed, nothing to show | `ErrorState` (with `onRetry`) |
+| Form validation / submit / action failed | `Alert variant="destructive"` |
+
+When adding a new page, follow this convention rather than choosing arbitrarily. If you find an existing page that violates it, fix it as part of your change.
+
+---
+
 ## Testing
+
+### Backend BigInt Fields
+
+Every backend wire field carrying a large integer must be added to `BIGINT_KEYS` in [lib/api.ts](lib/api.ts) and to the field-name alternatives in `parseWithBigInts`' pre-parse regex. Both are required to avoid precision loss in `JSON.parse`. Add or update coverage in [lib/**tests**/api.test.ts](lib/__tests__/api.test.ts).
 
 ### Writing Tests
 
@@ -284,6 +394,19 @@ npm run test:watch
 # Coverage report
 npm run test:coverage
 ```
+
+### End-to-End Tests
+
+Install the Chromium browser once after installing npm dependencies, then run the Playwright suite:
+
+```bash
+npm ci
+npx playwright install chromium
+npm run test:e2e
+```
+
+The Playwright configuration starts the Next.js development server on port 3001. The E2E tests
+intercept backend requests so the login and payment-request flows do not require a running API.
 
 ### Coverage Requirements
 
@@ -457,44 +580,4 @@ git push origin feature/name --force-with-lease
 - ✅ Code follows style guide
 - ✅ Tests are comprehensive
 - ✅ No breaking changes
-- ✅ Documentation is clear
-- ✅ Performance is acceptable
-- ✅ Security best practices followed
-
-### Responding to Feedback
-
-1. Read feedback carefully
-2. Ask questions if unclear
-3. Make requested changes
-4. Push updates
-5. Mark conversations as resolved
-
----
-
-## Resources
-
-- [CI/CD Setup Guide](./CI-CD-SETUP.md)
-- [GitHub Actions Workflows](./.github/WORKFLOWS.md)
-- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
-- [React Documentation](https://react.dev/)
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Tailwind CSS](https://tailwindcss.com/docs)
-
----
-
-## Questions?
-
-- Check existing issues/discussions
-- Ask in PR comments
-- Contact team lead
-- Review documentation
-
----
-
-## Code of Conduct
-
-Please note that this project is released with a [Contributor Code of Conduct](./CODE_OF_CONDUCT.md). By participating in this project you agree to abide by its terms.
-
----
-
-Thank you for contributing to AFRAMP! 🚀
+- ✅ Documentation

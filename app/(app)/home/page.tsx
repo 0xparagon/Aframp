@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 
@@ -8,54 +8,66 @@ import { ActivityHighlights } from '@/components/wallet/activity-highlights'
 import { BalanceFigure } from '@/components/wallet/balance-figure'
 import { QuickActions } from '@/components/wallet/quick-actions'
 import { QuickConvert } from '@/components/wallet/quick-convert'
-import { RevenueChart } from '@/components/wallet/revenue-chart'
 import { ErrorState } from '@/components/ui/error-state'
-import { LoadingSpinner } from '@/components/ui/loading-spinner'
+import { HomePageSkeleton } from '@/components/wallet/home-page-skeleton'
 import { OnboardingChecklist } from '@/components/onboarding/onboarding-checklist'
-import { api, type Balance, type Payment, type PaymentRequest } from '@/lib/api'
+import { api, type Payment, type PaymentRequest, type Wallet, type Withdrawal } from '@/lib/api'
 import { useAuthenticatedSession } from '@/components/session-provider'
+import { useDataLoader } from '@/hooks/use-data-loader'
+import { useMemo } from 'react'
+
+// recharts is ~150 KB gzipped, so load the chart after the dashboard renders.
+const RevenueChart = dynamic(
+  () => import('@/components/wallet/revenue-chart').then((mod) => mod.RevenueChart),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="bg-panel border-hairline h-[19rem] animate-pulse rounded-2xl border" />
+    ),
+  }
+)
+
+interface DashboardData {
+  balances: Awaited<ReturnType<typeof api.getBalances>>
+  payments: Payment[]
+  requests: PaymentRequest[]
+  wallet: Wallet | null
+  withdrawals: Withdrawal[]
+}
 
 export default function HomePage() {
   const { token } = useAuthenticatedSession()
-  const [balances, setBalances] = useState<Balance[] | null>(null)
-  const [payments, setPayments] = useState<Payment[]>([])
-  const [openRequests, setOpenRequests] = useState<PaymentRequest[]>([])
-  const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(
-    async (signal?: AbortSignal) => {
-      setError(null)
-      try {
-        const [nextBalances, nextPayments, requests] = await Promise.all([
-          api.getBalances(token, signal),
-          api.listTransactions(token, 50, signal),
-          api.listPaymentRequests(token, 20, signal),
-        ])
-        setBalances(nextBalances)
-        setPayments(nextPayments)
-        setOpenRequests(requests.filter((request) => request.status === 'pending'))
-      } catch (cause) {
-        if (cause instanceof DOMException && cause.name === 'AbortError') return
-        setError(cause instanceof Error ? cause.message : 'Could not load your dashboard')
-        setBalances([])
-      }
+  const { data, error, loading, reload } = useDataLoader<DashboardData>(
+    async (signal) => {
+      const [balances, payments, requests, wallet, withdrawals] = await Promise.all([
+        api.getBalances(token, signal),
+        api.listTransactions(token, 50, signal),
+        api.listPaymentRequests(token, 20, signal),
+        // Only used to tick off the getting-started steps, so a failure here
+        // shouldn't take the whole dashboard down.
+        api.getWallet(token, signal).catch(() => null),
+        api.listWithdrawals(token, 1, signal).catch(() => [] as Withdrawal[]),
+      ])
+      return { balances, payments, requests, wallet, withdrawals }
     },
     [token]
   )
 
-  useEffect(() => {
-    const controller = new AbortController()
-    void load(controller.signal)
-    return () => controller.abort()
-  }, [load])
+  const openRequests = useMemo(
+    () => data?.requests.filter((request) => request.status === 'pending') ?? [],
+    [data?.requests]
+  )
 
-  if (error) return <ErrorState message={error} onRetry={() => void load()} />
-  if (!balances) {
-    return (
-      <div className="flex justify-center py-16">
-        <LoadingSpinner />
-      </div>
-    )
+  if (error) return <ErrorState message={error} onRetry={reload} />
+  if (loading || !data) return <HomePageSkeleton />
+
+  const { balances, payments } = data
+  const progress = {
+    wallet: data.wallet !== null,
+    charge: data.requests.length > 0,
+    payment: payments.some((payment) => payment.status === 'confirmed'),
+    cashout: data.withdrawals.length > 0,
   }
 
   return (
@@ -74,11 +86,16 @@ export default function HomePage() {
       </header>
 
       <div className="mt-6">
-        <OnboardingChecklist />
+        <OnboardingChecklist progress={progress} />
       </div>
 
       <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <section className="bg-panel border-hairline rounded-2xl border p-5">
+        <section
+          className="bg-panel border-hairline rounded-2xl border p-5"
+          aria-live="polite"
+          aria-atomic="true"
+          aria-label="Available balance"
+        >
           <p className="text-dim text-xs">Available to cash out</p>
           {balances.length === 0 ? (
             <p className="mt-1 text-4xl font-bold tracking-tight tabular-nums">

@@ -16,7 +16,7 @@
   --secondary: oklch(0.95 0.01 90);
   --secondary-foreground: oklch(0.15 0.01 60);
   --muted: oklch(0.94 0.01 90);
-  --muted-foreground: oklch(0.38 0.01 60);
+  --muted-foreground: oklch(0.44 0.01 60);
   --accent: oklch(0.75 0.15 85);
   --accent-foreground: oklch(0.15 0.01 60);
   --destructive: oklch(0.577 0.245 27.325);
@@ -120,6 +120,41 @@
 
 .border-beam {
   animation: border-beam 8s linear infinite;
+}
+
+/* Loading skeletons: a soft pulse with a light sweep across it. */
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes skeleton-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton {
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.skeleton-sweep {
+  animation: skeleton-sweep 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .skeleton-sweep {
+    animation: none;
+  }
 }
 
 /* Shimmer animation for CTA */
@@ -338,7 +373,7 @@
   --color-hairline: #1f1e1d;
   --color-nav-active: #232425;
 
-  --color-dim: #8e9094;
+  --color-dim: #a6a8ac;
   --color-bright: #c9cbcf;
 
   --font-brand: var(--font-atkinson), ui-sans-serif, system-ui, -apple-system, sans-serif;

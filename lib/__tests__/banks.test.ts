@@ -1,9 +1,17 @@
-import { BANKS_BY_COUNTRY, GHANA_BANKS, KENYA_BANKS, NIGERIA_BANKS } from '@/lib/banks'
+import { BANKS, BANKS_BY_COUNTRY, GHANA_BANKS, KENYA_BANKS, NIGERIA_BANKS } from '@/lib/banks'
 
 describe('banks', () => {
-  it('exposes a Nigerian bank list for cNGN cash-outs', () => {
+  it('exposes a Nigerian bank list for cNGN cash-outs and exports BANKS alias', () => {
     expect(NIGERIA_BANKS.length).toBeGreaterThan(0)
+    expect(BANKS).toBe(NIGERIA_BANKS)
     expect(NIGERIA_BANKS[0]).toEqual({ code: '044', name: 'Access Bank' })
+    expect(NIGERIA_BANKS.some((b) => b.name === 'Kuda Bank' && b.code === '50211')).toBe(true)
+    expect(NIGERIA_BANKS.some((b) => b.name === 'Moniepoint MFB' && b.code === '50515')).toBe(true)
+    expect(NIGERIA_BANKS.some((b) => b.name === 'PalmPay' && b.code === '999991')).toBe(true)
+    expect(NIGERIA_BANKS.some((b) => b.name === 'VFD Microfinance Bank' && b.code === '566')).toBe(
+      true
+    )
+    expect(NIGERIA_BANKS.some((b) => b.name === 'Carbon' && b.code === '565')).toBe(true)
   })
 
   it('exposes a Kenyan bank / mobile-money list', () => {

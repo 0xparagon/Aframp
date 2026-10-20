@@ -1,8 +1,10 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { redirect } from 'next/navigation'
 import {
   api,
+  isOffline,
   setUnauthorizedHandler,
   type AuthResponse,
   type LoginResult,
@@ -10,7 +12,8 @@ import {
   type OtpChallengeResponse,
 } from '@/lib/api'
 
-const STORAGE_KEY = 'aframp.session'
+// #633: token is now stored in an HTTP-only cookie via /api/session,
+// not in localStorage. No token is ever readable by client-side JS.
 
 interface Session {
   token: string
@@ -20,17 +23,23 @@ interface Session {
 
 interface SessionContextValue {
   session: Session | null
-  /** False until localStorage has been read — guards against redirecting on first paint. */
+  /** False until the cookie has been read from the server — guards against redirecting on first paint. */
   ready: boolean
-  /** Returns the raw result so the caller can branch: a session (legacy
-   * no-phone accounts) vs a challenge (everyone else) that needs `/verify`. */
   signIn: (email: string, password: string) => Promise<LoginResult>
   /** Always a challenge — the account doesn't exist until `completeOtp` succeeds. */
-  signUp: (email: string, password: string, name: string, phoneNumber: string) => Promise<OtpChallengeResponse>
+  signUp: (
+    email: string,
+    password: string,
+    name: string,
+    phoneNumber: string
+  ) => Promise<OtpChallengeResponse>
   completeOtp: (challengeId: string, code: string) => Promise<void>
   signOut: () => void
-  /** Re-fetches /me and updates any cached profile data. */
-  refreshMe: () => Promise<Me | null>
+  /** Re-fetches /me and updates any cached profile data. Returns a discriminated
+   * union so callers can distinguish between success, network errors, and auth
+   * failures (401). Auth failures are not caught — they propagate to trigger
+   * signOut via the unauthorized handler. */
+  refreshMe: () => Promise<{ success: true; data: Me } | { success: false; reason: 'network' }>
   /** Latest profile data from /me, if fetched. */
   me: Me | null
 }
@@ -45,29 +54,46 @@ function toSession(response: AuthResponse): Session {
   }
 }
 
+/** Persist the session to the HTTP-only cookie via the API route. */
+async function persistCookie(next: Session): Promise<void> {
+  await fetch('/api/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(next),
+  })
+}
+
+/** Clear the HTTP-only cookie. */
+async function clearCookie(): Promise<void> {
+  await fetch('/api/session', { method: 'DELETE' })
+}
+
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [ready, setReady] = useState(false)
   const [me, setMe] = useState<Me | null>(null)
 
+  // #633: on mount, read the session from the HTTP-only cookie via
+  // /api/session (GET). This replaces the localStorage read.
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(STORAGE_KEY)
-      if (stored) setSession(JSON.parse(stored) as Session)
-    } catch {
-      window.localStorage.removeItem(STORAGE_KEY)
-    }
-    setReady(true)
+    fetch('/api/session')
+      .then((res) => res.json() as Promise<Session | null>)
+      .then((stored) => {
+        if (stored?.token) setSession(stored)
+      })
+      .catch(() => {
+        // Network error on startup — start with no session.
+      })
+      .finally(() => setReady(true))
   }, [])
 
-  const persist = useCallback((next: Session) => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-    } catch {
-      // Storage may be unavailable (private mode, quota, blocked) — the
-      // session still works for this tab, it just won't survive a reload.
-    }
+  const persist = useCallback(async (next: Session) => {
     setSession(next)
+    try {
+      await persistCookie(next)
+    } catch {
+      // Best-effort: the session still works for this tab if the cookie write fails.
+    }
   }, [])
 
   const signIn = useCallback(
@@ -75,45 +101,52 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       const result = await api.login(email, password)
       // Only a legacy no-phone account gets a session straight away; a
       // challenge means the caller still has to route to `/verify`.
-      if ('token' in result) persist(toSession(result))
+      if ('token' in result) await persist(toSession(result))
       return result
     },
     [persist]
   )
 
-  const signUp = useCallback((email: string, password: string, name: string, phoneNumber: string) => {
-    return api.signup(email, password, name, phoneNumber)
-  }, [])
+  const signUp = useCallback(
+    (email: string, password: string, name: string, phoneNumber: string) => {
+      return api.signup(email, password, name, phoneNumber)
+    },
+    []
+  )
 
   const completeOtp = useCallback(
     async (challengeId: string, code: string) => {
-      persist(toSession(await api.verifyOtp(challengeId, code)))
+      await persist(toSession(await api.verifyOtp(challengeId, code)))
     },
     [persist]
   )
 
   const signOut = useCallback(() => {
-    // Best-effort: a failed logout call shouldn't block clearing the local
-    // session, but it's the only thing that clears the server-side cookie.
     if (session) api.logout(session.token).catch(() => {})
-    window.localStorage.removeItem(STORAGE_KEY)
+    clearCookie().catch(() => {})
     setSession(null)
     setMe(null)
   }, [session])
 
   const refreshMe = useCallback(async () => {
-    if (!session) return null
+    if (!session) {
+      throw new Error('refreshMe called without a session')
+    }
     try {
       const data = await api.getMe(session.token)
       setMe(data)
-      return data
-    } catch {
-      return null
+      return { success: true as const, data }
+    } catch (cause) {
+      // Network errors (status 0) are recoverable — report them without sign-out.
+      // Auth errors (401) are not caught here; they propagate to trigger the
+      // unauthorized handler in lib/api.ts, which calls signOut.
+      if (isOffline(cause)) {
+        return { success: false as const, reason: 'network' as const }
+      }
+      throw cause
     }
   }, [session])
 
-  // Tokens expire after 24h with no refresh path, so drop the session on any
-  // 401 from an authenticated call — the route guards handle the redirect.
   useEffect(() => {
     setUnauthorizedHandler(signOut)
     return () => setUnauthorizedHandler(null)
@@ -133,12 +166,8 @@ export function useSession() {
   return context
 }
 
-/**
- * For screens that cannot render without a token. The `(app)` layout guarantees
- * one exists before mounting children, so this narrows the type for them.
- */
 export function useAuthenticatedSession(): Session {
   const { session } = useSession()
-  if (!session) throw new Error('This screen requires a signed-in merchant')
+  if (!session) redirect('/login')
   return session
 }

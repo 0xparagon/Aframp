@@ -7,7 +7,7 @@ export function HowItWorks() {
     <section id="how-it-works" className="bg-charcoal relative overflow-hidden px-6 py-20">
       {/* Particle bursts extracted from the design export. */}
       <Image
-        src="/landing/particles-left.png"
+        src="/landing/particles-left.webp"
         alt=""
         aria-hidden="true"
         width={360}
@@ -15,7 +15,7 @@ export function HowItWorks() {
         className="pointer-events-none absolute top-1/2 -left-10 hidden w-64 -translate-y-1/2 lg:block"
       />
       <Image
-        src="/landing/particles-right.png"
+        src="/landing/particles-right.webp"
         alt=""
         aria-hidden="true"
         width={360}

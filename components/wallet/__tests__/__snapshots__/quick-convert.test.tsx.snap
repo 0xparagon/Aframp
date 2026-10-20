@@ -1,0 +1,218 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`QuickConvert snapshot test for empty state 1`] = `
+<section
+  class="bg-panel border-hairline rounded-2xl border p-5"
+>
+  <div
+    class="flex items-start justify-between"
+  >
+    <div>
+      <p
+        class="text-dim text-xs"
+      >
+        Pending
+      </p>
+      <h2
+        class="text-lg font-bold tracking-tight text-white"
+      >
+        Waiting to be paid
+      </h2>
+    </div>
+  </div>
+  <p
+    class="text-dim mt-5 text-sm"
+  >
+    No open charges right now.
+  </p>
+  <a
+    class="from-cta-from to-cta-to mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r py-3 text-sm font-bold text-black transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
+    href="/charge"
+  >
+    New charge
+    <svg
+      class="lucide lucide-arrow-right size-4"
+      fill="none"
+      height="24"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2.5"
+      viewBox="0 0 24 24"
+      width="24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M5 12h14"
+      />
+      <path
+        d="m12 5 7 7-7 7"
+      />
+    </svg>
+  </a>
+</section>
+`;
+
+exports[`QuickConvert snapshot test for populated state 1`] = `
+<section
+  class="bg-panel border-hairline rounded-2xl border p-5"
+>
+  <div
+    class="flex items-start justify-between"
+  >
+    <div>
+      <p
+        class="text-dim text-xs"
+      >
+        Pending
+      </p>
+      <h2
+        class="text-lg font-bold tracking-tight text-white"
+      >
+        Waiting to be paid
+      </h2>
+    </div>
+  </div>
+  <ul
+    class="mt-5 space-y-3"
+  >
+    <li>
+      <a
+        class="hover:bg-raised/60 flex items-center justify-between gap-3 rounded-lg px-2 py-2 transition-colors"
+        href="/request/req1"
+      >
+        <span
+          class="flex items-center gap-2 text-sm font-bold text-white"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-clock text-dim size-3.5"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+            />
+            <polyline
+              points="12 6 12 12 16 14"
+            />
+          </svg>
+          50
+           
+          XLM
+        </span>
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-arrow-right text-dim size-4"
+          fill="none"
+          height="24"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M5 12h14"
+          />
+          <path
+            d="m12 5 7 7-7 7"
+          />
+        </svg>
+      </a>
+    </li>
+    <li>
+      <a
+        class="hover:bg-raised/60 flex items-center justify-between gap-3 rounded-lg px-2 py-2 transition-colors"
+        href="/request/req2"
+      >
+        <span
+          class="flex items-center gap-2 text-sm font-bold text-white"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-clock text-dim size-3.5"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+            />
+            <polyline
+              points="12 6 12 12 16 14"
+            />
+          </svg>
+          100
+           
+          USDC
+        </span>
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-arrow-right text-dim size-4"
+          fill="none"
+          height="24"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M5 12h14"
+          />
+          <path
+            d="m12 5 7 7-7 7"
+          />
+        </svg>
+      </a>
+    </li>
+  </ul>
+  <a
+    class="from-cta-from to-cta-to mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r py-3 text-sm font-bold text-black transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
+    href="/charge"
+  >
+    New charge
+    <svg
+      class="lucide lucide-arrow-right size-4"
+      fill="none"
+      height="24"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2.5"
+      viewBox="0 0 24 24"
+      width="24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M5 12h14"
+      />
+      <path
+        d="m12 5 7 7-7 7"
+      />
+    </svg>
+  </a>
+</section>
+`;

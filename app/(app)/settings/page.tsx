@@ -25,6 +25,9 @@ import {
 import { api, ApiError, type Me } from '@/lib/api'
 import { useAuthenticatedSession, useSession } from '@/components/session-provider'
 
+/** RFC-5322-inspired regex that catches obviously malformed addresses client-side. */
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 function getInitials(name: string | null): string {
   if (!name) return '?'
   return name
@@ -46,12 +49,15 @@ export default function ProfilePage() {
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingEmail, setSavingEmail] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
   const [name, setName] = useState('')
   const [merchantName, setMerchantName] = useState('')
   const [newEmail, setNewEmail] = useState('')
+  const [emailFormatError, setEmailFormatError] = useState<string | null>(null)
   const [emailSent, setEmailSent] = useState(false)
 
   const load = useCallback(
@@ -64,6 +70,7 @@ export default function ProfilePage() {
         setName(data.name ?? '')
         setMerchantName(data.merchant_name ?? '')
         setNewEmail(data.email ?? '')
+        setEmailFormatError(null)
       } catch (cause) {
         if (cause instanceof DOMException && cause.name === 'AbortError') return
         if (cause instanceof ApiError && cause.status === 0) throw cause
@@ -107,8 +114,12 @@ export default function ProfilePage() {
         merchant_name: merchantName.trim() || undefined,
       })
       setMe((prev) => (prev ? { ...prev, ...updated } : prev))
-      await refreshMe()
-      showSuccess('Profile updated successfully.')
+      const result = await refreshMe()
+      if (result.success) {
+        showSuccess('Profile updated successfully.')
+      }
+      // Network errors are handled silently here - the UI already shows the
+      // updated local state, and the next render will retry.
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not update profile')
     } finally {
@@ -119,10 +130,18 @@ export default function ProfilePage() {
   async function sendEmailVerification(event: React.FormEvent) {
     event.preventDefault()
     const email = newEmail.trim()
+
     if (!email || email === me?.email) {
       setError('Enter a new email address to change it.')
       return
     }
+
+    if (!EMAIL_REGEX.test(email)) {
+      setEmailFormatError('Please enter a valid email address.')
+      return
+    }
+
+    setEmailFormatError(null)
     setSavingEmail(true)
     setError(null)
     try {
@@ -147,6 +166,26 @@ export default function ProfilePage() {
       setError(cause instanceof Error ? cause.message : 'Could not delete account')
       setDeleting(false)
     }
+  }
+
+  function openDeleteDialog() {
+    setDeleteDialogOpen(true)
+    setDeleteConfirmEmail('')
+    setError(null)
+  }
+
+  function closeDeleteDialog() {
+    setDeleteDialogOpen(false)
+    setDeleteConfirmEmail('')
+  }
+
+  async function confirmDelete() {
+    if (deleteConfirmEmail.trim() !== displayEmail) {
+      setError('Email does not match')
+      return
+    }
+    setDeleteDialogOpen(false)
+    await deleteAccount()
   }
 
   if (loading && !me) {
@@ -254,10 +293,18 @@ export default function ProfilePage() {
                 value={newEmail}
                 onChange={(e) => {
                   setNewEmail(e.target.value)
+                  setEmailFormatError(null)
                   setEmailSent(false)
                 }}
                 placeholder="you@example.com"
+                aria-describedby={emailFormatError ? 'email-format-error' : undefined}
+                aria-invalid={emailFormatError ? true : undefined}
               />
+              {emailFormatError && (
+                <p id="email-format-error" className="text-sm text-destructive" role="alert">
+                  {emailFormatError}
+                </p>
+              )}
               <p className="text-dim text-xs">
                 Changing your email requires verification. We will send a confirmation link to the
                 new address.
@@ -300,29 +347,47 @@ export default function ProfilePage() {
           wallet, and API keys. This action cannot be undone.
         </p>
 
-        <AlertDialog>
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <AlertDialogTrigger asChild>
-            <Button variant="destructive" className="w-full sm:w-auto">
+            <Button variant="destructive" className="w-full sm:w-auto" onClick={openDeleteDialog}>
               <Trash2 className="size-4" aria-hidden /> Delete account
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Delete your account?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will permanently delete your merchant account, wallet, payment history, and all
-                API keys. Any pending payments or withdrawals will be lost. This action{' '}
-                <strong>cannot be undone</strong>.
+              <AlertDialogDescription className="space-y-3">
+                <p>
+                  This will permanently delete your merchant account, wallet, payment history, and
+                  all API keys. Any pending payments or withdrawals will be lost.
+                </p>
+                <p className="font-semibold text-destructive">This action cannot be undone.</p>
+                <div className="space-y-2 pt-2">
+                  <Label htmlFor="delete-confirm-email" className="text-foreground">
+                    Type your email address to confirm: <strong>{displayEmail}</strong>
+                  </Label>
+                  <Input
+                    id="delete-confirm-email"
+                    type="email"
+                    placeholder={displayEmail}
+                    value={deleteConfirmEmail}
+                    onChange={(e) => setDeleteConfirmEmail(e.target.value)}
+                    disabled={deleting}
+                    autoComplete="off"
+                  />
+                </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={deleting} onClick={closeDeleteDialog}>
+                Cancel
+              </AlertDialogCancel>
               <AlertDialogAction
                 onClick={(e) => {
                   e.preventDefault()
-                  void deleteAccount()
+                  void confirmDelete()
                 }}
-                disabled={deleting}
+                disabled={deleting || deleteConfirmEmail.trim() !== displayEmail}
                 className="bg-destructive text-white hover:bg-destructive/90"
               >
                 {deleting ? 'Deleting…' : 'Yes, delete my account'}

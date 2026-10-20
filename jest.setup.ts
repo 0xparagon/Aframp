@@ -3,6 +3,9 @@ import { Blob, File } from 'buffer'
 import { ReadableStream, TransformStream, WritableStream } from 'stream/web'
 import { MessageChannel, MessagePort, BroadcastChannel } from 'worker_threads'
 import '@testing-library/jest-dom'
+import { toHaveNoViolations } from 'jest-axe'
+
+expect.extend(toHaveNoViolations)
 
 // Set TextEncoder/Decoder and Streams/Message globals first because undici needs them on load
 global.TextDecoder = TextDecoder as any
@@ -59,3 +62,32 @@ const polyfills = {
 
 Object.defineProperties(global, polyfills)
 Object.defineProperties(globalThis, polyfills)
+
+// jsdom has no matchMedia; hooks/use-media-query.ts needs it. Default to "no match".
+if (typeof window !== 'undefined' && !window.matchMedia) {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    configurable: true,
+    value: (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }),
+  })
+}
+
+// Tests must not hit the network. undici's real fetch also crashes under jsdom
+// (removeAbortListener/markResourceTiming), so the default fetch rejects like an
+// offline request; tests that need responses install their own mock.
+const unmockedFetch = () => Promise.reject(new TypeError('Network request not mocked in this test'))
+Object.defineProperty(globalThis, 'fetch', {
+  value: unmockedFetch,
+  writable: true,
+  enumerable: true,
+  configurable: true,
+})

@@ -1,5 +1,6 @@
 import type { Balance } from '@/lib/api'
 import { BANKS_BY_COUNTRY, type Bank, type BankCountry } from '@/lib/banks'
+import { formatStroops, isAmountMultipleOf } from '@/lib/money'
 
 /**
  * Assets with a cash-out (offramp) route. cNGN settles to Nigerian bank
@@ -15,6 +16,8 @@ export interface WithdrawalAssetConfig {
   country: BankCountry
   /** Lowest amount a merchant can cash out, in stroops. */
   minimumStroops: bigint
+  /** Smallest supported currency sub-unit, in stroops. */
+  minimumPrecisionStroops: bigint
   accountNumberLength: number
 }
 
@@ -27,24 +30,50 @@ export const WITHDRAWAL_ASSET_CONFIG: Record<WithdrawalAsset, WithdrawalAssetCon
     asset: 'cNGN',
     country: 'Nigeria',
     minimumStroops: 500_000_000n,
+    minimumPrecisionStroops: 100_000n,
     accountNumberLength: 10,
   },
   cKES: {
     asset: 'cKES',
     country: 'Kenya',
     minimumStroops: 100_000_000n,
+    minimumPrecisionStroops: 100_000n,
     accountNumberLength: 10,
   },
   cGHS: {
     asset: 'cGHS',
     country: 'Ghana',
     minimumStroops: 50_000_000n,
+    minimumPrecisionStroops: 100_000n,
     accountNumberLength: 10,
   },
 }
 
 export function getWithdrawalAssetConfig(asset: WithdrawalAsset): WithdrawalAssetConfig {
   return WITHDRAWAL_ASSET_CONFIG[asset]
+}
+
+export function validateWithdrawal(
+  amount: bigint | null,
+  config: WithdrawalAssetConfig,
+  available: bigint,
+  bankCode: string,
+  accountNumber: string
+): string | null {
+  if (amount === null || amount <= 0n) return 'Enter an amount to cash out.'
+  if (!isAmountMultipleOf(amount, config.minimumPrecisionStroops)) {
+    return 'Amount must have at most 2 decimal places.'
+  }
+  if (amount < config.minimumStroops) {
+    return `The smallest cash-out is ${formatStroops(config.minimumStroops)} ${config.asset}.`
+  }
+  if (amount > available) return 'That is more than your available balance.'
+  if (!bankCode) return 'Choose your bank.'
+  if (accountNumber.length !== config.accountNumberLength) {
+    return `Account numbers are ${config.accountNumberLength} digits.`
+  }
+  if (!/^\d+$/.test(accountNumber)) return 'Account number must contain digits only.'
+  return null
 }
 
 /** Banks / mobile-money options for the country a given asset settles in. */

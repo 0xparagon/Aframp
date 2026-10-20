@@ -40,6 +40,7 @@ interface SendState {
   error: string | null
   feeEstimate: FeeEstimate | null
   loadingFee: boolean
+  feeError: boolean
   submitting: boolean
   remittances: Remittance[]
   showContacts: boolean
@@ -65,6 +66,7 @@ export default function SendPage() {
     error: null,
     feeEstimate: null,
     loadingFee: false,
+    feeError: false,
     submitting: false,
     remittances: [],
     showContacts: false,
@@ -116,17 +118,19 @@ export default function SendPage() {
   useEffect(() => {
     const stroops = parseAmountToStroops(state.amount)
     if (stroops === null || stroops <= 0n) {
-      setState((prev) => ({ ...prev, feeEstimate: null }))
+      setState((prev) => ({ ...prev, feeEstimate: null, feeError: false }))
       return
     }
 
     const loadFee = async () => {
-      setState((prev) => ({ ...prev, loadingFee: true }))
+      setState((prev) => ({ ...prev, loadingFee: true, feeError: false }))
       try {
         const estimate = await api.getRemittanceFeeEstimate(token, stroops, state.asset)
         setState((prev) => ({ ...prev, feeEstimate: estimate, loadingFee: false }))
       } catch {
-        setState((prev) => ({ ...prev, feeEstimate: null, loadingFee: false }))
+        // A failed estimate must never block the send: fall back to the plain
+        // amount and let the user know the fee could not be fetched (#708).
+        setState((prev) => ({ ...prev, feeEstimate: null, loadingFee: false, feeError: true }))
       }
     }
 
@@ -145,7 +149,8 @@ export default function SendPage() {
 
   function validate(): string | null {
     if (!state.address) return 'Enter recipient address.'
-    if (!validateAddress()) return 'Recipient address must be a valid 56-character Stellar address starting with G.'
+    if (!validateAddress())
+      return 'Recipient address must be a valid 56-character Stellar address starting with G.'
     if (stroops === null || stroops <= 0n) return 'Enter an amount to send.'
     if (!isWholeKobo(stroops)) return 'Amount must be a whole number of stroops.'
     if (stroops > available) return 'That is more than your available balance.'
@@ -162,13 +167,20 @@ export default function SendPage() {
 
     setState((prev) => ({ ...prev, submitting: true, error: null }))
     try {
-      await api.createRemittance(token, state.address, stroops!, state.asset, state.memo || undefined)
+      await api.createRemittance(
+        token,
+        state.address,
+        stroops!,
+        state.asset,
+        state.memo || undefined
+      )
       setState((prev) => ({
         ...prev,
         address: '',
         amount: '',
         memo: '',
         feeEstimate: null,
+        feeError: false,
         error: null,
       }))
       await load()
@@ -314,21 +326,29 @@ export default function SendPage() {
             <div className="bg-raised border-hairline rounded-lg border p-3 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-dim">Amount</span>
-                <span>{formatStroops(stroops ?? 0n)} {state.asset}</span>
+                <span>
+                  {formatStroops(stroops ?? 0n)} {state.asset}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-dim">Fee</span>
-                <span>{formatStroops(state.feeEstimate.fee_stroops)} {state.asset}</span>
+                <span>
+                  {formatStroops(state.feeEstimate.fee_stroops)} {state.asset}
+                </span>
               </div>
               {state.feeEstimate.network_fee_stroops > 0n && (
                 <div className="flex justify-between">
                   <span className="text-dim">Network fee</span>
-                  <span>{formatStroops(state.feeEstimate.network_fee_stroops)} {state.asset}</span>
+                  <span>
+                    {formatStroops(state.feeEstimate.network_fee_stroops)} {state.asset}
+                  </span>
                 </div>
               )}
               <div className="border-hairline border-t pt-2 flex justify-between font-bold">
                 <span>Total</span>
-                <span>{formatStroops(totalAmount ?? 0n)} {state.asset}</span>
+                <span>
+                  {formatStroops(totalAmount ?? 0n)} {state.asset}
+                </span>
               </div>
             </div>
           )}
@@ -337,6 +357,13 @@ export default function SendPage() {
             <p className="text-dim text-xs flex items-center gap-2">
               <LoadingSpinner className="size-3" />
               Calculating fee estimate...
+            </p>
+          )}
+
+          {state.feeError && stroops && stroops > 0n && (
+            <p role="status" className="text-warning text-xs">
+              Fee estimate unavailable. You can still send; the exact fee is applied when the
+              payment is submitted.
             </p>
           )}
 
@@ -351,9 +378,15 @@ export default function SendPage() {
 
         {state.remittances.length > 0 && (
           <section className="space-y-3">
-            <h2 className="text-dim text-xs font-bold tracking-widest uppercase">
-              Recent sends
-            </h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-dim text-xs font-bold tracking-widest uppercase">Recent sends</h2>
+              <Link
+                href="/remittances"
+                className="text-brand text-xs font-semibold hover:underline"
+              >
+                View all
+              </Link>
+            </div>
             <ul className="border-hairline divide-y">
               {state.remittances.map((remittance) => (
                 <li key={remittance.id} className="space-y-1 py-3">

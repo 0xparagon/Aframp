@@ -1,0 +1,265 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`HomePageSkeleton matches snapshot 1`] = `
+<div>
+  <header
+    class="flex flex-wrap items-start justify-between gap-4"
+  >
+    <div>
+      <h1
+        class="text-2xl font-bold tracking-tight"
+      >
+        Home
+      </h1>
+      <p
+        class="text-dim mt-1 text-sm"
+      >
+        Track balances and payment activity in one place.
+      </p>
+    </div>
+    <div
+      class="skeleton relative overflow-hidden bg-muted/40 dark:bg-muted/30 h-10 w-36 rounded-full"
+      data-slot="skeleton"
+    >
+      <div
+        class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+      />
+    </div>
+  </header>
+  <div
+    class="mt-6"
+  >
+    <div
+      class="skeleton relative overflow-hidden bg-muted/40 dark:bg-muted/30 h-24 w-full rounded-2xl"
+      data-slot="skeleton"
+    >
+      <div
+        class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+      />
+    </div>
+  </div>
+  <div
+    class="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]"
+  >
+    <section
+      class="bg-panel border-hairline rounded-2xl border p-5"
+    >
+      <p
+        class="text-dim text-xs"
+      >
+        Available to cash out
+      </p>
+      <div
+        class="mt-1 space-y-3"
+      >
+        <div>
+          <div
+            class="space-y-2"
+          >
+            <div
+              class="flex items-baseline gap-2"
+            >
+              <div
+                class="skeleton relative overflow-hidden rounded bg-muted/40 dark:bg-muted/30 h-10 w-48"
+                data-slot="skeleton"
+              >
+                <div
+                  class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                />
+              </div>
+              <div
+                class="skeleton relative overflow-hidden rounded bg-muted/40 dark:bg-muted/30 h-4 w-12"
+                data-slot="skeleton"
+              >
+                <div
+                  class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div
+            class="space-y-2"
+          >
+            <div
+              class="flex items-baseline gap-2"
+            >
+              <div
+                class="skeleton relative overflow-hidden rounded bg-muted/40 dark:bg-muted/30 h-10 w-48"
+                data-slot="skeleton"
+              >
+                <div
+                  class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                />
+              </div>
+              <div
+                class="skeleton relative overflow-hidden rounded bg-muted/40 dark:bg-muted/30 h-4 w-12"
+                data-slot="skeleton"
+              >
+                <div
+                  class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div
+        class="mt-6"
+      >
+        <div
+          class="skeleton relative overflow-hidden bg-muted/40 dark:bg-muted/30 h-20 w-full rounded-xl"
+          data-slot="skeleton"
+        >
+          <div
+            class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+          />
+        </div>
+      </div>
+      <div
+        class="mt-6"
+      >
+        <div
+          class="skeleton relative overflow-hidden bg-muted/40 dark:bg-muted/30 h-32 w-full rounded-xl"
+          data-slot="skeleton"
+        >
+          <div
+            class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+          />
+        </div>
+      </div>
+    </section>
+    <div
+      class="space-y-5"
+    >
+      <section
+        class="bg-panel border-hairline rounded-2xl border p-5"
+      >
+        <div
+          class="flex items-start justify-between"
+        >
+          <div>
+            <p
+              class="text-dim text-xs"
+            >
+              Pending
+            </p>
+            <h2
+              class="text-lg font-bold tracking-tight text-white"
+            >
+              Waiting to be paid
+            </h2>
+          </div>
+        </div>
+        <div
+          class="mt-5 space-y-3"
+        >
+          <div
+            class="skeleton relative overflow-hidden bg-muted/40 dark:bg-muted/30 h-10 w-full rounded-lg"
+            data-slot="skeleton"
+          >
+            <div
+              class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+            />
+          </div>
+          <div
+            class="skeleton relative overflow-hidden bg-muted/40 dark:bg-muted/30 h-10 w-full rounded-lg"
+            data-slot="skeleton"
+          >
+            <div
+              class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+            />
+          </div>
+          <div
+            class="skeleton relative overflow-hidden bg-muted/40 dark:bg-muted/30 h-10 w-full rounded-lg"
+            data-slot="skeleton"
+          >
+            <div
+              class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+            />
+          </div>
+        </div>
+        <div
+          class="skeleton relative overflow-hidden bg-muted/40 dark:bg-muted/30 mt-5 h-12 w-full rounded-full"
+          data-slot="skeleton"
+        >
+          <div
+            class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+          />
+        </div>
+      </section>
+      <section
+        class="bg-panel border-hairline rounded-2xl border p-5"
+      >
+        <p
+          class="text-dim text-xs"
+        >
+          Today
+        </p>
+        <h2
+          class="text-lg font-bold tracking-tight text-white"
+        >
+          Activity highlights
+        </h2>
+        <dl
+          class="mt-4 space-y-3.5"
+        >
+          <div
+            class="flex items-baseline justify-between"
+          >
+            <div
+              class="skeleton relative overflow-hidden rounded bg-muted/40 dark:bg-muted/30 h-4 w-32"
+              data-slot="skeleton"
+            >
+              <div
+                class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+              />
+            </div>
+            <div
+              class="skeleton relative overflow-hidden rounded bg-muted/40 dark:bg-muted/30 h-4 w-20"
+              data-slot="skeleton"
+            >
+              <div
+                class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+              />
+            </div>
+          </div>
+          <div
+            class="flex items-baseline justify-between"
+          >
+            <div
+              class="skeleton relative overflow-hidden rounded bg-muted/40 dark:bg-muted/30 h-4 w-32"
+              data-slot="skeleton"
+            >
+              <div
+                class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+              />
+            </div>
+            <div
+              class="skeleton relative overflow-hidden rounded bg-muted/40 dark:bg-muted/30 h-4 w-20"
+              data-slot="skeleton"
+            >
+              <div
+                class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+              />
+            </div>
+          </div>
+        </dl>
+      </section>
+    </div>
+  </div>
+  <div
+    class="mt-5"
+  >
+    <div
+      class="skeleton relative overflow-hidden bg-muted/40 dark:bg-muted/30 h-64 w-full rounded-2xl"
+      data-slot="skeleton"
+    >
+      <div
+        class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+      />
+    </div>
+  </div>
+</div>
+`;

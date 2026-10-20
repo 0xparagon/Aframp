@@ -1,11 +1,22 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import {
   Select,
@@ -14,15 +25,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { api, ApiError, type Balance, type Withdrawal, type WithdrawalStatus } from '@/lib/api'
-import { formatStroops, isWholeKobo, parseAmountToStroops } from '@/lib/money'
+import {
+  api,
+  ApiError,
+  type Balance,
+  type Me,
+  type Withdrawal,
+  type WithdrawalStatus,
+} from '@/lib/api'
+import { formatStroops, parseAmountToStroops } from '@/lib/money'
 import { useAuthenticatedSession } from '@/components/session-provider'
 import {
   getBankOptions,
   getWithdrawableAssets,
   getWithdrawalAssetConfig,
+  validateWithdrawal,
   type WithdrawalAsset,
 } from '@/lib/withdraw'
+import { BANKS, type Bank } from '@/lib/banks'
+import { formatDateTime } from '@/lib/format-date'
 
 const STATUS_LABEL: Record<WithdrawalStatus, string> = {
   pending: 'Pending',
@@ -31,8 +52,18 @@ const STATUS_LABEL: Record<WithdrawalStatus, string> = {
   failed: 'Failed',
 }
 
+const STATUS_VARIANT: Record<WithdrawalStatus, 'default' | 'secondary' | 'destructive'> = {
+  pending: 'secondary',
+  processing: 'secondary',
+  completed: 'default',
+  failed: 'destructive',
+}
+
+const PAGE_SIZE = 20
+
 export default function WithdrawPage() {
   const { token } = useAuthenticatedSession()
+  const [me, setMe] = useState<Me | null>(null)
   const [balances, setBalances] = useState<Balance[] | null>(null)
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
   const [asset, setAsset] = useState<WithdrawalAsset>('cNGN')
@@ -41,14 +72,69 @@ export default function WithdrawPage() {
   const [accountNumber, setAccountNumber] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [nigeriaBanks, setNigeriaBanks] = useState<Bank[]>(BANKS)
+  const bankName = (code: string) =>
+    nigeriaBanks.find((bank) => bank.code === code)?.name ??
+    BANKS.find((bank) => bank.code === code)?.name ??
+    code
+  const [banksLoading, setBanksLoading] = useState(false)
+
+  useEffect(() => {
+    let isMounted = true
+    async function loadBanks() {
+      setBanksLoading(true)
+      try {
+        const res = await fetch('/api/banks')
+        if (!res.ok) throw new Error('Failed to fetch banks')
+        const json = await res.json()
+        const list = Array.isArray(json) ? json : json?.data
+        if (Array.isArray(list) && list.length > 0 && isMounted) {
+          setNigeriaBanks(
+            list.map((b: { code: string | number; name: string }) => ({
+              code: String(b.code),
+              name: String(b.name),
+            }))
+          )
+        }
+      } catch {
+        if (isMounted) {
+          setNigeriaBanks(BANKS)
+        }
+      } finally {
+        if (isMounted) {
+          setBanksLoading(false)
+        }
+      }
+    }
+
+    void loadBanks()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const [limit, setLimit] = useState(PAGE_SIZE)
+  const [loadingMore, setLoadingMore] = useState(false)
+  // The API only takes a limit, so a full page back means there may be older entries.
+  const hasMore = withdrawals.length >= limit
+
+  const [confirmation, setConfirmation] = useState<{
+    amount: bigint
+    asset: WithdrawalAsset
+    bankCode: string
+    bankName: string
+    accountNumber: string
+  } | null>(null)
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
       try {
-        const [nextBalances, nextWithdrawals] = await Promise.all([
+        const [nextMe, nextBalances, nextWithdrawals] = await Promise.all([
+          api.getMe(token, signal),
           api.getBalances(token, signal),
-          api.listWithdrawals(token, 20, signal),
+          api.listWithdrawals(token, limit, signal),
         ])
+        setMe(nextMe)
         setBalances(nextBalances)
         setWithdrawals(nextWithdrawals)
       } catch (cause) {
@@ -62,7 +148,7 @@ export default function WithdrawPage() {
         setBalances([])
       }
     },
-    [token]
+    [token, limit]
   )
 
   useEffect(() => {
@@ -70,6 +156,19 @@ export default function WithdrawPage() {
     void load(controller.signal)
     return () => controller.abort()
   }, [load])
+
+  async function loadMore() {
+    const nextLimit = limit + PAGE_SIZE
+    setLoadingMore(true)
+    try {
+      setWithdrawals(await api.listWithdrawals(token, nextLimit))
+      setLimit(nextLimit)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not load older cash-outs')
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   const withdrawableAssets = useMemo(() => getWithdrawableAssets(balances ?? []), [balances])
   const config = getWithdrawalAssetConfig(asset)
@@ -86,35 +185,39 @@ export default function WithdrawPage() {
   // If the selected asset no longer has a balance (e.g. after a cash-out), fall
   // back to the first asset the merchant can still cash out.
   useEffect(() => {
-    if (withdrawableAssets.length === 0 || withdrawableAssets.includes(asset)) return
-    selectAsset(withdrawableAssets[0])
+    if (withdrawableAssets.length > 0 && !withdrawableAssets.includes(asset)) {
+      selectAsset(withdrawableAssets[0])
+    }
   }, [withdrawableAssets, asset, selectAsset])
 
-  function validate(): string | null {
-    if (stroops === null || stroops <= 0n) return 'Enter an amount to cash out.'
-    if (!isWholeKobo(stroops)) return 'Amount must have at most 2 decimal places.'
-    if (stroops < config.minimumStroops)
-      return `The smallest cash-out is ${formatStroops(config.minimumStroops)} ${asset}.`
-    if (stroops > available) return 'That is more than your available balance.'
-    if (!bankCode) return 'Choose your bank.'
-    if (accountNumber.length !== config.accountNumberLength) {
-      return `Account numbers are ${config.accountNumberLength} digits.`
-    }
-    return null
-  }
-
-  async function submit(event: React.FormEvent) {
+  function submit(event: React.FormEvent) {
     event.preventDefault()
-    const problem = validate()
+    const problem = validateWithdrawal(stroops, config, available, bankCode, accountNumber)
     if (problem) {
       setError(problem)
       return
     }
 
+    const bankName = getBankOptions(asset).find((bank) => bank.code === bankCode)?.name ?? bankCode
+    setError(null)
+    setConfirmation({ amount: stroops!, asset, bankCode, bankName, accountNumber })
+  }
+
+  async function confirmWithdrawal() {
+    if (!confirmation) return
+
+    const request = confirmation
+    setConfirmation(null)
     setSubmitting(true)
     setError(null)
     try {
-      await api.createWithdrawal(token, stroops!, bankCode, accountNumber, asset)
+      await api.createWithdrawal(
+        token,
+        request.amount,
+        request.bankCode,
+        request.accountNumber,
+        request.asset
+      )
       setAmount('')
       setBankCode('')
       setAccountNumber('')
@@ -127,10 +230,35 @@ export default function WithdrawPage() {
     }
   }
 
-  if (!balances) {
+  // A failed load leaves `me` null; fall through so the error below is shown.
+  if (!balances || (!me && !error)) {
     return (
       <div className="flex justify-center py-16">
         <LoadingSpinner />
+      </div>
+    )
+  }
+
+  if (me && me.kyc_status !== 'approved') {
+    return (
+      <div>
+        <header>
+          <h1 className="text-2xl font-bold tracking-tight">Cash out</h1>
+        </header>
+
+        <div className="mt-6 max-w-xl space-y-5">
+          <Alert>
+            <AlertDescription>
+              {me.kyc_status === 'pending'
+                ? 'Your identity verification is still being reviewed. You can cash out once it is approved.'
+                : 'Verify your identity before you can cash out.'}
+            </AlertDescription>
+          </Alert>
+
+          <Button asChild>
+            <Link href="/kyc">Complete verification</Link>
+          </Button>
+        </div>
       </div>
     )
   }
@@ -190,7 +318,25 @@ export default function WithdrawPage() {
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="amount">Amount ({asset})</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="amount">Amount ({asset})</Label>
+              <button
+                type="button"
+                className="text-brand text-xs font-semibold hover:underline disabled:opacity-50"
+                disabled={available === 0n}
+                onClick={() =>
+                  // Round down to the smallest unit the bank can pay out.
+                  setAmount(
+                    formatStroops(available - (available % config.minimumPrecisionStroops)).replace(
+                      /,/g,
+                      ''
+                    )
+                  )
+                }
+              >
+                Max
+              </button>
+            </div>
             <Input
               id="amount"
               inputMode="decimal"
@@ -203,12 +349,16 @@ export default function WithdrawPage() {
 
           <div className="space-y-2">
             <Label htmlFor="bank">Bank</Label>
-            <Select value={bankCode} onValueChange={setBankCode} disabled={available === 0n}>
+            <Select
+              value={bankCode}
+              onValueChange={setBankCode}
+              disabled={available === 0n || banksLoading}
+            >
               <SelectTrigger id="bank">
-                <SelectValue placeholder="Choose your bank" />
+                <SelectValue placeholder={banksLoading ? 'Loading banks…' : 'Choose your bank'} />
               </SelectTrigger>
               <SelectContent>
-                {getBankOptions(asset).map((bank) => (
+                {(asset === 'cNGN' ? nigeriaBanks : getBankOptions(asset)).map((bank) => (
                   <SelectItem key={bank.code} value={bank.code}>
                     {bank.name}
                   </SelectItem>
@@ -223,7 +373,7 @@ export default function WithdrawPage() {
               id="account"
               inputMode="numeric"
               maxLength={config.accountNumberLength}
-              placeholder="0123456789"
+              placeholder={`${config.accountNumberLength}-digit account number`}
               value={accountNumber}
               disabled={available === 0n}
               onChange={(event) =>
@@ -234,43 +384,90 @@ export default function WithdrawPage() {
             />
           </div>
 
-          <Button type="submit" size="lg" disabled={submitting || available === 0n}>
-            {submitting ? 'Sending…' : 'Cash out'}
+          <Button type="submit" disabled={submitting || available === 0n}>
+            {submitting ? 'Submitting…' : 'Cash out'}
           </Button>
         </form>
 
-        {withdrawals.length > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-dim text-xs font-bold tracking-widest uppercase">
-              Recent cash-outs
-            </h2>
-            <ul className="border-hairline divide-y">
+        <AlertDialog
+          open={confirmation !== null}
+          onOpenChange={(open) => {
+            if (!open) setConfirmation(null)
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm cash-out</AlertDialogTitle>
+              <AlertDialogDescription>
+                Review the details before sending your withdrawal.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {confirmation && (
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                <dt className="text-muted-foreground">Amount</dt>
+                <dd className="font-medium">
+                  {formatStroops(confirmation.amount)} {confirmation.asset}
+                </dd>
+                <dt className="text-muted-foreground">Asset</dt>
+                <dd>{confirmation.asset}</dd>
+                <dt className="text-muted-foreground">Bank</dt>
+                <dd>{confirmation.bankName}</dd>
+                <dt className="text-muted-foreground">Account</dt>
+                <dd>••••••{confirmation.accountNumber.slice(-4)}</dd>
+              </dl>
+            )}
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction disabled={submitting} onClick={() => void confirmWithdrawal()}>
+                {submitting ? 'Sending…' : 'Confirm cash out'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold tracking-tight">Recent cash-outs</h2>
+          {withdrawals.length === 0 ? (
+            <p className="text-dim text-sm">No cash-outs yet.</p>
+          ) : (
+            <ul className="space-y-2">
               {withdrawals.map((withdrawal) => (
-                <li key={withdrawal.id} className="space-y-1 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-bold tabular-nums text-white">
+                <li
+                  key={withdrawal.id}
+                  className="bg-panel border-hairline flex items-center justify-between gap-3 rounded-xl border p-4"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium">
                       {formatStroops(withdrawal.amount_stroops)} {withdrawal.asset}
-                    </span>
-                    <Badge
-                      variant={
-                        withdrawal.status === 'completed'
-                          ? 'default'
-                          : withdrawal.status === 'failed'
-                            ? 'destructive'
-                            : 'secondary'
-                      }
-                    >
-                      {STATUS_LABEL[withdrawal.status] ?? withdrawal.status}
-                    </Badge>
+                    </p>
+                    <p className="text-dim text-xs">
+                      {formatDateTime(withdrawal.created_at)}
+                      {withdrawal.bank_code && ` · ${bankName(withdrawal.bank_code)}`}
+                      {withdrawal.account_number && ` ••••${withdrawal.account_number.slice(-4)}`}
+                    </p>
+                    {withdrawal.status === 'failed' && withdrawal.failure_reason && (
+                      <p className="text-neg mt-1 text-xs">{withdrawal.failure_reason}</p>
+                    )}
                   </div>
-                  {withdrawal.failure_reason && (
-                    <p className="text-dim text-xs">{withdrawal.failure_reason}</p>
-                  )}
+                  <Badge variant={STATUS_VARIANT[withdrawal.status]} className="shrink-0">
+                    {STATUS_LABEL[withdrawal.status]}
+                  </Badge>
                 </li>
               ))}
             </ul>
-          </section>
-        )}
+          )}
+          {hasMore && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={loadMore}
+              disabled={loadingMore}
+            >
+              {loadingMore ? 'Loading…' : 'Load more'}
+            </Button>
+          )}
+        </section>
       </div>
     </div>
   )

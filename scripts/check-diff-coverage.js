@@ -62,7 +62,12 @@ function loadCoverageSummary() {
 
 function coverageFor(summary, relativeFile) {
   const absolute = path.resolve(__dirname, '..', relativeFile)
-  return summary[absolute] ?? null
+  if (summary[absolute]) return summary[absolute]
+  // The report may come from another checkout location (e.g. CI's test
+  // container writes /app/...), so fall back to matching the repo-relative path.
+  const suffix = `/${relativeFile}`
+  const key = Object.keys(summary).find((candidate) => candidate.endsWith(suffix))
+  return key ? summary[key] : null
 }
 
 function main() {

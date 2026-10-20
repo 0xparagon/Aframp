@@ -1,0 +1,55 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`BalanceFigureSkeleton matches snapshot for large size 1`] = `
+<div
+  class="space-y-2"
+>
+  <div
+    class="flex items-baseline gap-2"
+  >
+    <div
+      class="skeleton relative overflow-hidden rounded bg-muted/40 dark:bg-muted/30 h-10 w-48"
+      data-slot="skeleton"
+    >
+      <div
+        class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+      />
+    </div>
+    <div
+      class="skeleton relative overflow-hidden rounded bg-muted/40 dark:bg-muted/30 h-4 w-12"
+      data-slot="skeleton"
+    >
+      <div
+        class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+      />
+    </div>
+  </div>
+</div>
+`;
+
+exports[`BalanceFigureSkeleton matches snapshot for small size 1`] = `
+<div
+  class="space-y-2"
+>
+  <div
+    class="flex items-baseline gap-2"
+  >
+    <div
+      class="skeleton relative overflow-hidden rounded bg-muted/40 dark:bg-muted/30 h-7 w-32"
+      data-slot="skeleton"
+    >
+      <div
+        class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+      />
+    </div>
+    <div
+      class="skeleton relative overflow-hidden rounded bg-muted/40 dark:bg-muted/30 h-4 w-12"
+      data-slot="skeleton"
+    >
+      <div
+        class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+      />
+    </div>
+  </div>
+</div>
+`;

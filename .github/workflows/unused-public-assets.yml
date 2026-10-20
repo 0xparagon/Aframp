@@ -1,0 +1,27 @@
+name: Unused public assets
+
+# Guards against dead weight accumulating in public/ — see issue #670.
+# Complements the image *size* budget with a usage check: an asset that
+# nothing references is a cost at any size.
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+jobs:
+  unused-public-assets:
+    name: No unreferenced files in public/
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check public/ for unused assets
+        run: node scripts/check-unused-public-assets.mjs

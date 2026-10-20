@@ -1,9 +1,10 @@
 'use client'
 
-import { use, useCallback, useEffect, useState } from 'react'
+import { use, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import QRCode from 'react-qr-code'
-import { Check, Clock, TriangleAlert } from 'lucide-react'
+import { Check, Clock, Copy, TriangleAlert } from 'lucide-react'
+import { AframpMark } from '@/components/brand/aframp-mark'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
@@ -14,6 +15,9 @@ import { formatStroops } from '@/lib/money'
 /** The backend confirms a deposit within one Horizon poll cycle (60s default). */
 const POLL_INTERVAL_MS = 3000
 
+/** Stop polling after this many consecutive failed loads. */
+const MAX_CONSECUTIVE_ERRORS = 3
+
 function secondsUntil(iso: string): number {
   return Math.max(0, Math.floor((new Date(iso).getTime() - Date.now()) / 1000))
 }
@@ -21,6 +25,54 @@ function secondsUntil(iso: string): number {
 function formatCountdown(seconds: number): string {
   const minutes = Math.floor(seconds / 60)
   return `${minutes}:${String(seconds % 60).padStart(2, '0')}`
+}
+
+/** One labelled value the customer has to enter exactly, with a copy button. */
+function CopyField({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current)
+    },
+    []
+  )
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      if (timer.current) clearTimeout(timer.current)
+      timer.current = setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Clipboard blocked (e.g. insecure context): the value stays selectable.
+    }
+  }
+
+  return (
+    <>
+      <dt className="text-foreground text-xs font-medium">{label}</dt>
+      <dd className="mb-2 flex items-start justify-between gap-3">
+        <span className="font-heading min-w-0 break-all text-xs select-all">{value}</span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0 gap-1.5"
+          onClick={() => void copy()}
+          aria-label={copied ? `${label} copied` : `Copy ${label.toLowerCase()}`}
+        >
+          {copied ? (
+            <Check className="size-3.5" aria-hidden />
+          ) : (
+            <Copy className="size-3.5" aria-hidden />
+          )}
+          {copied ? 'Copied' : 'Copy'}
+        </Button>
+      </dd>
+    </>
+  )
 }
 
 export default function PaymentRequestPage({ params }: { params: Promise<{ id: string }> }) {
@@ -55,10 +107,24 @@ export default function PaymentRequestPage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     const controller = new AbortController()
     let timer: ReturnType<typeof setTimeout>
+    let consecutiveErrors = 0
 
     const tick = async () => {
       const next = await load(controller.signal)
       if (controller.signal.aborted) return
+
+      if (next) {
+        // Successful load — reset the backoff counter.
+        consecutiveErrors = 0
+      } else {
+        consecutiveErrors += 1
+        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+          // Give up polling and let the user retry manually.
+          setError('backend-down')
+          return
+        }
+      }
+
       if (!next || next.status === 'pending') {
         timer = setTimeout(tick, POLL_INTERVAL_MS)
       }
@@ -104,12 +170,13 @@ export default function PaymentRequestPage({ params }: { params: Promise<{ id: s
 
   const amount = `${formatStroops(request.amount_stroops)} ${request.asset}`
   const paidAmount = request.amount_paid_stroops ?? 0n
-  const paidRatio = request.amount_stroops > 0n ? Number((paidAmount * 100n) / request.amount_stroops) : 0
+  const paidRatio =
+    request.amount_stroops > 0n ? Number((paidAmount * 100n) / request.amount_stroops) : 0
   const hasPartialPayment = request.allow_partial || paidAmount > 0n
 
   if (request.status === 'paid') {
     return (
-      <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-6 px-6 text-center">
+      <main className="font-brand mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-6 px-6 text-center">
         <div className="bg-primary/15 text-primary flex size-20 items-center justify-center rounded-full">
           <Check className="size-10" aria-hidden />
         </div>
@@ -126,7 +193,7 @@ export default function PaymentRequestPage({ params }: { params: Promise<{ id: s
 
   if (request.status === 'expired') {
     return (
-      <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-6 px-6 text-center">
+      <main className="font-brand mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-6 px-6 text-center">
         <div className="bg-muted text-muted-foreground flex size-20 items-center justify-center rounded-full">
           <Clock className="size-10" aria-hidden />
         </div>
@@ -144,12 +211,18 @@ export default function PaymentRequestPage({ params }: { params: Promise<{ id: s
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 px-6 py-10">
+    <main className="font-brand mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 px-6 py-10">
+      <div className="flex items-center justify-center gap-2">
+        <AframpMark className="size-7" />
+        <span className="text-sm font-bold tracking-tight">Aframp</span>
+      </div>
       <header className="space-y-1 text-center">
         <p className="text-muted-foreground text-xs font-medium tracking-widest uppercase">
-          Ask your customer to scan
+          {request.sep7_uri ? 'Ask your customer to scan' : 'Ask your customer to pay'}
         </p>
-        <p className="font-display text-4xl font-semibold tracking-tight tabular-nums">{amount}</p>
+        <h1 className="font-display text-4xl font-semibold tracking-tight tabular-nums">
+          {amount}
+        </h1>
       </header>
 
       {error && (
@@ -187,7 +260,7 @@ export default function PaymentRequestPage({ params }: { params: Promise<{ id: s
       {hasPartialPayment && (
         <div className="bg-muted/50 rounded-2xl p-4 text-sm">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <span className="text-muted-foreground">Paid so far</span>
+            <span className="text-foreground">Paid so far</span>
             <span className="font-semibold tabular-nums">
               {formatStroops(paidAmount)} / {formatStroops(request.amount_stroops)} {request.asset}
             </span>
@@ -201,34 +274,22 @@ export default function PaymentRequestPage({ params }: { params: Promise<{ id: s
         </div>
       )}
 
-      <dl className="bg-muted/50 space-y-3 rounded-2xl p-4 text-sm">
-        <div className="space-y-1">
-          <dt className="text-muted-foreground text-xs">Pay to</dt>
-          <dd className="font-heading text-xs break-all">{request.address}</dd>
-        </div>
-        <div className="space-y-1">
-          <dt className="text-muted-foreground text-xs">Reference (memo)</dt>
-          <dd className="font-heading text-xs break-all">{request.memo}</dd>
-        </div>
+      <dl className="bg-muted/50 space-y-4 rounded-2xl p-4 text-sm">
+        <CopyField label="Amount" value={formatStroops(request.amount_stroops)} />
+        <CopyField label="Pay to" value={request.address} />
+        <CopyField label="Reference (memo)" value={request.memo} />
       </dl>
+      <p className="text-muted-foreground -mt-3 text-center text-xs">
+        The reference must be included exactly, or the payment can&apos;t be matched to this charge.
+      </p>
 
       <p
-        className="text-muted-foreground flex items-center justify-center gap-2 text-sm"
+        className="flex items-center justify-center gap-2 text-sm text-foreground"
         aria-live="polite"
       >
         <Clock className="size-4" aria-hidden />
-        Expires in <span className="tabular-nums">{formatCountdown(remaining)}</span>
+        {remaining > 0 ? `Expires in ${formatCountdown(remaining)}` : 'Expiring…'}
       </p>
-
-      <div className="space-y-2">
-        <Button asChild variant="outline" size="lg" className="w-full">
-          <Link href="/charge">Back to keypad</Link>
-        </Button>
-        {/* There's no cancel endpoint — a request can only expire on its own. */}
-        <p className="text-muted-foreground text-center text-xs">
-          This code stays payable until it expires.
-        </p>
-      </div>
     </main>
   )
 }

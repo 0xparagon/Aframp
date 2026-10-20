@@ -10,8 +10,23 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useSession } from '@/components/session-provider'
 import { isOffline } from '@/lib/api'
+import { CHALLENGE_SESSION_KEY } from '@/lib/otp-challenge'
+
+import { getPasswordStrength, isCommonPassword } from '@/lib/password-strength'
+import { PasswordInput } from '@/components/ui/password-input'
+import { AuthHeader } from '@/components/brand/auth-header'
 
 const MIN_PASSWORD_LENGTH = 8
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+const STRENGTH_COLOR = [
+  'bg-destructive',
+  'bg-destructive',
+  'bg-yellow-500',
+  'bg-green-500',
+  'bg-green-600',
+]
 
 export default function SignupPage() {
   const { session, ready, signUp } = useSession()
@@ -19,8 +34,11 @@ export default function SignupPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [phone, setPhone] = useState('')
+  const strength = getPasswordStrength(password)
   const [error, setError] = useState<string | null>(null)
+  const [emailError, setEmailError] = useState<string | null>(null)
   const [offline, setOffline] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
@@ -31,10 +49,17 @@ export default function SignupPage() {
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     setError(null)
+    setEmailError(null)
     setOffline(false)
 
     if (!name.trim() || !email.trim() || !password.trim() || !phone.trim()) {
       setError('Please fill in your business name, email, password, and phone number.')
+      setSubmitting(false)
+      return
+    }
+
+    if (!EMAIL_PATTERN.test(email.trim())) {
+      setEmailError('Enter a valid email address.')
       setSubmitting(false)
       return
     }
@@ -46,10 +71,24 @@ export default function SignupPage() {
       return
     }
 
+    if (isCommonPassword(password)) {
+      setError('That password is too common. Choose something harder to guess.')
+      setSubmitting(false)
+      return
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.')
+      setSubmitting(false)
+      return
+    }
+
     setSubmitting(true)
     try {
       const challenge = await signUp(email.trim(), password, name.trim(), phone.trim())
-      router.push(`/verify?challenge_id=${challenge.challenge_id}&flow=signup`)
+      // #638: store challenge_id in sessionStorage instead of the URL
+      sessionStorage.setItem(CHALLENGE_SESSION_KEY, challenge.challenge_id)
+      router.push('/verify?flow=signup')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not create your account')
       setOffline(isOffline(cause))
@@ -58,13 +97,11 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-8 px-6 py-12">
-      <header className="space-y-2">
-        <h1 className="font-display text-3xl font-semibold tracking-tight">Create your account</h1>
-        <p className="text-muted-foreground text-sm">
-          Takes a minute. You&apos;ll get a payment address straight after.
-        </p>
-      </header>
+    <main className="font-brand mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-8 px-6 py-12">
+      <AuthHeader
+        title="Create your account"
+        subtitle="Takes a minute. You'll get a payment address straight after."
+      />
 
       <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-4">
         {error && (
@@ -92,9 +129,19 @@ export default function SignupPage() {
             type="email"
             autoComplete="email"
             required
+            aria-invalid={emailError ? true : undefined}
+            aria-describedby={emailError ? 'email-error' : undefined}
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            onChange={(event) => {
+              setEmail(event.target.value)
+              if (emailError) setEmailError(null)
+            }}
           />
+          {emailError && (
+            <p id="email-error" className="text-destructive text-xs">
+              {emailError}
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -115,18 +162,50 @@ export default function SignupPage() {
 
         <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="new-password"
             required
             minLength={MIN_PASSWORD_LENGTH}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
-          <p className="text-muted-foreground text-xs">
-            At least {MIN_PASSWORD_LENGTH} characters.
-          </p>
+          {password ? (
+            <div aria-live="polite" className="space-y-1">
+              <div className="flex gap-1" aria-hidden>
+                {[1, 2, 3, 4].map((segment) => (
+                  <div
+                    key={segment}
+                    className={`h-1 flex-1 rounded-full ${
+                      strength.score >= segment ? STRENGTH_COLOR[strength.score] : 'bg-muted'
+                    }`}
+                  />
+                ))}
+              </div>
+              <p className="text-muted-foreground text-xs">
+                Strength: {strength.label}
+                {strength.isCommon && ' — this is a very common password'}
+              </p>
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-xs">
+              At least {MIN_PASSWORD_LENGTH} characters. Mix letters, numbers and symbols.
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="confirm-password">Confirm password</Label>
+          <PasswordInput
+            id="confirm-password"
+            autoComplete="new-password"
+            required
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+          />
+          {confirmPassword && confirmPassword !== password && (
+            <p className="text-destructive text-xs">Passwords don&apos;t match.</p>
+          )}
         </div>
 
         <Button type="submit" size="lg" disabled={submitting} className="mt-2">

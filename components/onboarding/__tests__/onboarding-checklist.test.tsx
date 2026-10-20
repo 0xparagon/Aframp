@@ -1,38 +1,48 @@
 import { render, screen } from '@testing-library/react'
-import { OnboardingChecklist } from '../onboarding-checklist'
+import { OnboardingChecklist, type OnboardingProgress } from '../onboarding-checklist'
+
+const none: OnboardingProgress = { wallet: false, charge: false, payment: false, cashout: false }
 
 describe('OnboardingChecklist', () => {
-  beforeEach(() => {
-    window.localStorage.clear()
-    window.sessionStorage.clear()
-  })
+  it('lists every step with a link to the page that completes it', () => {
+    render(<OnboardingChecklist progress={none} />)
 
-  it('renders the merchant onboarding steps when the wallet has not been created yet', () => {
-    render(<OnboardingChecklist />)
-
-    expect(screen.getByText('Get started with your first Aframp wallet')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Create wallet/i })).toHaveAttribute('href', '/wallet-setup')
-    expect(screen.getByRole('link', { name: /Create first charge/i })).toHaveAttribute('href', '/bills')
-    expect(screen.getByRole('link', { name: /Receive first payment/i })).toHaveAttribute('href', '/receive')
-    expect(screen.getByRole('link', { name: /Cash out/i })).toHaveAttribute('href', '/offramp')
-  })
-
-  it('hides the checklist when the wallet has already been created', () => {
-    window.localStorage.setItem('walletAddress', 'GAXYZABC123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789ABCDEFG')
-
-    render(<OnboardingChecklist />)
-
-    expect(screen.queryByText('Get started with your first Aframp wallet')).not.toBeInTheDocument()
-  })
-
-  it('hides the checklist when all steps are marked complete', () => {
-    window.localStorage.setItem(
-      'aframp-merchant-checklist',
-      JSON.stringify({ wallet: true, charge: true, payment: true, cashout: true })
+    expect(screen.getByRole('link', { name: 'Set up your wallet' })).toHaveAttribute(
+      'href',
+      '/wallet'
     )
+    expect(screen.getByRole('link', { name: 'Create your first charge' })).toHaveAttribute(
+      'href',
+      '/charge'
+    )
+    expect(screen.getByRole('link', { name: 'Receive your first payment' })).toHaveAttribute(
+      'href',
+      '/transactions'
+    )
+    expect(screen.getByRole('link', { name: 'Cash out to your bank' })).toHaveAttribute(
+      'href',
+      '/withdraw'
+    )
+    expect(screen.getByText('0 of 4 done')).toBeInTheDocument()
+  })
 
-    render(<OnboardingChecklist />)
+  it('ticks off the steps the merchant has actually done', () => {
+    render(<OnboardingChecklist progress={{ ...none, wallet: true, charge: true }} />)
 
-    expect(screen.queryByText('Get started with your first Aframp wallet')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Set up your wallet (done)' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Create your first charge (done)' })
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Receive your first payment' })).toBeInTheDocument()
+    expect(screen.getByText('2 of 4 done')).toBeInTheDocument()
+  })
+
+  it('is hidden once every step is done', () => {
+    const { container } = render(
+      <OnboardingChecklist
+        progress={{ wallet: true, charge: true, payment: true, cashout: true }}
+      />
+    )
+    expect(container).toBeEmptyDOMElement()
   })
 })

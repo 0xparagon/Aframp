@@ -38,14 +38,18 @@ export function PushNotificationToggle() {
       api
         .registerPushSubscription(token, detail)
         .then(() => setBackendEnabled(true))
-        .catch((err) => setApiError(err instanceof Error ? err.message : 'Could not save subscription'))
+        .catch((err) =>
+          setApiError(err instanceof Error ? err.message : 'Could not save subscription')
+        )
     }
 
     function onUnsubscribe() {
       api
         .unregisterPushSubscription(token)
         .then(() => setBackendEnabled(false))
-        .catch((err) => setApiError(err instanceof Error ? err.message : 'Could not remove subscription'))
+        .catch((err) =>
+          setApiError(err instanceof Error ? err.message : 'Could not remove subscription')
+        )
     }
 
     window.addEventListener('aframp:push-subscribe', onSubscribe)
@@ -66,8 +70,8 @@ export function PushNotificationToggle() {
         <div>
           <p className="text-sm font-medium text-white">Push notifications</p>
           <p className="text-dim text-xs mt-0.5">
-            Your browser or device does not support Web Push notifications. On iOS, make sure
-            you have added Aframp to your Home Screen first.
+            Your browser or device does not support Web Push notifications. On iOS, make sure you
+            have added Aframp to your Home Screen first.
           </p>
         </div>
       </div>

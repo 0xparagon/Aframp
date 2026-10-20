@@ -7,11 +7,13 @@ export function WhyUs() {
     <section className="grid lg:grid-cols-[minmax(0,420px)_1fr]">
       <div className="bg-brand-deep hidden items-center justify-center p-12 lg:flex">
         <Image
-          src="/landing/why-us-wallet.png"
+          src="/landing/why-us-wallet.webp"
           alt=""
           aria-hidden="true"
           width={535}
           height={570}
+          sizes="(max-width: 1024px) 100vw, 320px"
+          decoding="async"
           className="h-auto w-full max-w-[320px]"
         />
       </div>

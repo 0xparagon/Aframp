@@ -1,21 +1,8 @@
-import withPWAInit from 'next-pwa'
-import defaultRuntimeCaching from 'next-pwa/cache.js'
 import { withSentryConfig } from '@sentry/nextjs'
 import withBundleAnalyzer from '@next/bundle-analyzer'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // PWA configuration (next-pwa v2 reads options from the `pwa` key)
-  pwa: {
-    dest: 'public',
-    register: true,
-    // skipWaiting: false — do NOT force immediate service worker updates.
-    // A waiting SW activates only after the user dismisses the update banner
-    // (see components/pwa-update-banner.tsx), preventing in-flight payment
-    // flows from being interrupted.
-    skipWaiting: false,
-    disable: process.env.NODE_ENV === 'development',
-  },
   experimental: {
     // Limit concurrency only in resource-constrained CI environments.
     // Set CI_LOW_RESOURCES=1 in your CI pipeline to enable these caps;
@@ -39,6 +26,7 @@ const nextConfig = {
   // forwards those requests server-side to the real backend. NEXT_API_URL
   // (deliberately not NEXT_PUBLIC_*) never reaches client-side code — it
   // can't leak via devtools, a bundle diff, or CSP `connect-src`.
+  // See docs/adr-001-backend-proxy.md for the rationale and consequences.
   rewrites() {
     const backendUrl = (process.env.NEXT_API_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '')
     return [
@@ -49,23 +37,15 @@ const nextConfig = {
     ]
   },
   headers() {
-    const csp = [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https:",
-      "font-src 'self' data:",
-      "connect-src 'self' https://api.coingecko.com https://horizon.stellar.org https://horizon-testnet.stellar.org https://*.sentry.io https://*.ingest.us.sentry.io https://vitals.vercel-insights.com",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-    ].join('; ')
-
+    // NOTE: The Content-Security-Policy header with per-request nonce is now
+    // set by middleware.ts (#632). The static-file entries below apply only to
+    // assets that bypass middleware (e.g. _next/static) and therefore do NOT
+    // include script-src so they don't clobber the nonce injected by the
+    // middleware on page routes.
     return [
       {
         source: '/(.*)',
         headers: [
-          { key: 'Content-Security-Policy', value: csp },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'X-XSS-Protection', value: '1; mode=block' },
@@ -77,40 +57,9 @@ const nextConfig = {
   },
 }
 
-// next-pwa@5.6.0 is incompatible with Next.js 15's webpack runtime and causes
-// "a[d] is not a function" errors during SSR prerendering in production builds.
-// Disable it until the project upgrades to @ducanh2912/next-pwa or similar.
-const withPWA = withPWAInit({
-  dest: 'public',
-  register: true,
-  skipWaiting: true,
-  reloadOnOnline: false,
-  disable: true, // was: process.env.NODE_ENV === 'development'
-  runtimeCaching: [
-    {
-      urlPattern: /\/api\/(?:exchange-rate|rates)(?:\/)?(?:\?.*)?$/,
-      handler: 'StaleWhileRevalidate',
-      method: 'GET',
-      options: {
-        cacheName: 'exchange-rates',
-        cacheableResponse: {
-          statuses: [0, 200],
-        },
-        expiration: {
-          maxEntries: 8,
-          maxAgeSeconds: 24 * 60 * 60,
-          purgeOnQuotaError: true,
-        },
-      },
-    },
-    ...defaultRuntimeCaching,
-  ],
-})
-
-const configWithPWA = withPWA(nextConfig)
 const withAnalyzer = withBundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
   openAnalyzer: false,
 })
 
-export default withSentryConfig(withAnalyzer(configWithPWA))
+export default withSentryConfig(withAnalyzer(nextConfig))

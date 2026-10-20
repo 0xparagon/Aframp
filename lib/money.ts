@@ -35,6 +35,11 @@ export function parseAmountToStroops(input: string): bigint | null {
 /** Withdrawals settle in kobo, so amounts must be whole multiples of 100,000 stroops. */
 export const STROOPS_PER_KOBO = 100_000n
 
+/** Returns whether an amount is aligned to the asset's supported increment. */
+export function isAmountMultipleOf(stroops: bigint, incrementStroops: bigint): boolean {
+  return incrementStroops > 0n && stroops % incrementStroops === 0n
+}
+
 export function isWholeKobo(stroops: bigint): boolean {
-  return stroops % STROOPS_PER_KOBO === 0n
+  return isAmountMultipleOf(stroops, STROOPS_PER_KOBO)
 }

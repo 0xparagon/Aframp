@@ -1,0 +1,62 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ActivityHighlightsSkeleton matches snapshot 1`] = `
+<section
+  class="bg-panel border-hairline rounded-2xl border p-5"
+>
+  <p
+    class="text-dim text-xs"
+  >
+    Today
+  </p>
+  <h2
+    class="text-lg font-bold tracking-tight text-white"
+  >
+    Activity highlights
+  </h2>
+  <dl
+    class="mt-4 space-y-3.5"
+  >
+    <div
+      class="flex items-baseline justify-between"
+    >
+      <div
+        class="skeleton relative overflow-hidden rounded bg-muted/40 dark:bg-muted/30 h-4 w-32"
+        data-slot="skeleton"
+      >
+        <div
+          class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+        />
+      </div>
+      <div
+        class="skeleton relative overflow-hidden rounded bg-muted/40 dark:bg-muted/30 h-4 w-20"
+        data-slot="skeleton"
+      >
+        <div
+          class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+        />
+      </div>
+    </div>
+    <div
+      class="flex items-baseline justify-between"
+    >
+      <div
+        class="skeleton relative overflow-hidden rounded bg-muted/40 dark:bg-muted/30 h-4 w-32"
+        data-slot="skeleton"
+      >
+        <div
+          class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+        />
+      </div>
+      <div
+        class="skeleton relative overflow-hidden rounded bg-muted/40 dark:bg-muted/30 h-4 w-20"
+        data-slot="skeleton"
+      >
+        <div
+          class="skeleton-sweep absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+        />
+      </div>
+    </div>
+  </dl>
+</section>
+`;

@@ -42,7 +42,8 @@ export function usePushNotifications(): UsePushNotificationsReturn {
   const [error, setError] = useState<string | null>(null)
   const swRef = useRef<ServiceWorkerRegistration | null>(null)
 
-  const isSupported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window
+  const isSupported =
+    typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window
 
   useEffect(() => {
     if (!isSupported) {

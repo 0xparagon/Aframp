@@ -81,7 +81,7 @@ export function calculateFees(
   totalCost: number
 } {
   const config = PROVIDER_CONFIGS[provider]
-  
+
   const processingFee = amount * config.feePercentage + config.fixedFee
   const vat = processingFee * config.vat
   const totalFees = processingFee + vat
