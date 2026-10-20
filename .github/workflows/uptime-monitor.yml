@@ -18,10 +18,10 @@ jobs:
       issues: write
     steps:
       - name: Restore prior failure count
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: .uptime-monitor-state.json
-          key: uptime-monitor-state-${{ github.repository }}
+          key: uptime-monitor-state-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: uptime-monitor-state-
 
       - name: Check homepage
@@ -88,8 +88,16 @@ jobs:
           echo "count=$FAILURES" >> "$GITHUB_OUTPUT"
           echo "down=$DOWN" >> "$GITHUB_OUTPUT"
 
+      # Cache entries are immutable, so save under a unique key per run; the
+      # restore step above picks up the most recent one via its prefix.
+      - name: Save failure count
+        uses: actions/cache/save@v4
+        with:
+          path: .uptime-monitor-state.json
+          key: uptime-monitor-state-${{ github.run_id }}-${{ github.run_attempt }}
+
       - name: Create outage issue after 3 failures
-        if: ${{ steps.failures.outputs.count == '3' }}
+        if: ${{ steps.failures.outputs.count >= 3 }}
         uses: actions/github-script@v7
         with:
           script: |
