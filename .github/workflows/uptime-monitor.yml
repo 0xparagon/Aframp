@@ -155,3 +155,4 @@ jobs:
             console.log(
               `🚨 ALERT: AFRAMP production endpoints are DOWN\n\nTime: ${new Date().toISOString()}\n\nAffected:\n${down}\n\nCheck: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}`
             );
+            core.setFailed(`AFRAMP production endpoints are DOWN:\n${down}`);
